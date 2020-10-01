@@ -1,5 +1,12 @@
 # Neuron-Java
-Neural network library written in Java
+## Neural network library written in Java
+
+Want to train networks in Keras/TensorFlow and run them in stand-alone Java applications? Then this is for you.
+
+## Requirements
+### [jblas](http://jblas.org/)
+
+(to be continued)
 
 ## Citation
 
