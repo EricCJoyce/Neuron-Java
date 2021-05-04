@@ -27,11 +27,23 @@ javac -version
 
 BLAS is a Fortran library of expertly optimized linear algebraic functions. jBLAS is Dr. Mikio Braun's adaptation of this powerful library to Java. Neuron-Java uses jBLAS to do matrix-matrix and matrix-vector multiplication as quickly as possible. Why depend on jBLAS rather than write these routines myself? Because the underlying BLAS is the bedrock of linear algebraic operations. As [Dr. Shusen Wang](http://wangshusen.github.io/) says, "Do not try to write and optimize these operations yourself. There are just... too many tricks."
 
-For you to use the Neuron-Java library, you'll need to install jBLAS. The following step successfully installed jBLAS version 1.2.4 on Ubuntu 18.04.
+For you to use the Neuron-Java library, you'll need to download the jBLAS JAR and install jBLAS. The following steps successfully installed jBLAS version 1.2.4 on Ubuntu 18.04.
 
-Open a command-line terminal and issue the following command:
+You will need the jBLAS Java archive file. Download it using the command line as follows, but take note of where you download this file; you will need to refer to it explicitly when compiling and running.
+```
+wget http://jblas.org/jars/jblas-1.2.4.jar
+```
+Now issue the following command:
 ```
 apt-get install jblas
+```
+Supposing you've saved the JAR and this Neuron-Java library's source in the same directory as your own code, `MyCode.java`, call the compiler like this:
+```
+javac -cp .:/my/sourcecode/directory/jblas-1.2.4.jar MyCode.java
+```
+Call the Java RTE like this:
+```
+java -cp .:/my/sourcecode/directory/jblas-1.2.4.jar MyCode
 ```
 
 ## Transfer Trained Weights from Keras
