@@ -37,11 +37,11 @@ Now issue the following command:
 ```
 apt-get install jblas
 ```
-Supposing you've saved the JAR and this Neuron-Java library's source in the same directory as your own code, `MyCode.java`, call the compiler like this:
+Supposing you've saved the JAR file, this Neuron-Java library's source, and your own code, `MyCode.java`, in the same directory `/my/sourcecode/directory`, call the compiler like this:
 ```
 javac -cp .:/my/sourcecode/directory/jblas-1.2.4.jar MyCode.java
 ```
-Call the Java RTE like this:
+Similarly, you'd call the Java RTE like this:
 ```
 java -cp .:/my/sourcecode/directory/jblas-1.2.4.jar MyCode
 ```
