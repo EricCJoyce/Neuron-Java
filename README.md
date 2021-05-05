@@ -29,7 +29,7 @@ BLAS is a Fortran library of expertly optimized linear algebraic functions. jBLA
 
 For you to use the Neuron-Java library, you'll need to download the jBLAS JAR and install jBLAS. The following steps successfully installed jBLAS version 1.2.4 on Ubuntu 18.04.
 
-You will need the jBLAS Java archive file. Download it using the command line as follows, but take note of where you download this file; you will need to refer to it explicitly when compiling and running.
+You will need the jBLAS Java archive file. Download it via the command line as follows, but take note of where you download this file; you will need to refer to it explicitly when compiling and running.
 ```
 wget http://jblas.org/jars/jblas-1.2.4.jar
 ```
