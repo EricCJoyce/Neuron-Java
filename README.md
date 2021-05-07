@@ -25,7 +25,7 @@ javac -version
 
 ### [jblas](http://jblas.org/)
 
-BLAS is a Fortran library of expertly optimized linear algebraic functions. jblas is Dr. Mikio Braun's adaptation of this powerful library to Java. Neuron-Java uses jblas to do matrix-matrix and matrix-vector multiplication as quickly as possible. Why depend on jblas rather than write these routines myself? Because the underlying BLAS is the bedrock of linear algebraic operations. As [Dr. Shusen Wang](http://wangshusen.github.io/) says, "Do not try to write and optimize these operations yourself. There are just... too many tricks."
+BLAS is a Fortran library of expertly optimized linear algebraic functions. jblas is [Dr. Mikio Braun](https://github.com/mikiobraun)'s adaptation of this powerful library to Java. Neuron-Java uses jblas to do matrix-matrix and matrix-vector multiplication as quickly as possible. Why depend on jblas rather than write these routines myself? Because the underlying BLAS is the bedrock of linear algebraic operations. As [Dr. Shusen Wang](http://wangshusen.github.io/) says, "Do not try to write and optimize these operations yourself. There are just... too many tricks."
 
 For you to use the Neuron-Java library, you'll need to download the jblas JAR and install jblas. The following steps successfully installed jblas version 1.2.4 on Ubuntu 18.04.
 
