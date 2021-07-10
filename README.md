@@ -41,7 +41,7 @@ Supposing you've saved the JAR file, this Neuron-Java library's source, and your
 ```
 javac -cp .:/my/sourcecode/directory/jblas-1.2.4.jar MyCode.java
 ```
-Similarly, you'd call the Java RTE like this:
+Similarly, you'd call the Java runtime environment (JRE) like this:
 ```
 java -cp .:/my/sourcecode/directory/jblas-1.2.4.jar MyCode
 ```
