@@ -32,10 +32,10 @@ def main():
 	for i in range(0, len(y_hat[0])):
 		print("%.6f" % y_hat[0][i])
 
-	args = ['./run', neuronFile, pgmfilename]
+	args = ['java', 'RunMNIST', neuronFile, pgmfilename]
 	out = subprocess.check_output(args)
 	out = out.decode("utf-8").split('\n')[:-1]
-	print('\nNeuron-C model returned:')
+	print('\nNeuron-Java model returned:')
 	for i in range(0, len(out)):
 		print(out[i].split()[1])
 
