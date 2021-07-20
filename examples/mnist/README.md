@@ -33,7 +33,7 @@ Weights exported from mnist_06.h5 have been put in the `06` directory.
 
 ## 4. Run Your Model in Java
 
-`RunMNIST.Java` expects an `.nn` file and a 28-by-28 `.pgm`. Appropriate `.pgm`s for each of 10 digits can be found in the `samples` folder. `run` loads the bitmap, converts it to floating-point values, feeds it to the network, and prints the network's probability distribution over `[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]`, reflecting its belief that the numeral depicted in the bitmap is the corresponding digit.
+`RunMNIST.java` expects an `.nn` file and a 28-by-28 `.pgm`. Appropriate `.pgm`s for each of 10 digits can be found in the `samples` folder. `run` loads the bitmap, converts it to floating-point values, feeds it to the network, and prints the network's probability distribution over `[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]`, reflecting its belief that the numeral depicted in the bitmap is the corresponding digit.
 
 ## 5. Compare Results
 
