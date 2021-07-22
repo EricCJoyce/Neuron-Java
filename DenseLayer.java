@@ -27,6 +27,10 @@
  Note that this file does NOT seed the randomizer. That should be done by the parent program.
 ***************************************************************************************************/
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.jblas.*;
 import static org.jblas.DoubleMatrix.*;
 
@@ -38,7 +42,7 @@ public class DenseLayer
     private DoubleMatrix M;                                         //  ((i + 1) x n) matrix, all either 0.0 or 1.0
     private int f[];                                                //  n-array
     private double alpha[];                                         //  n-array
-    private String name;
+    private String layerName;
     private DoubleMatrix out;                                       //  n-array
 
     /*  DenseLayer 'nameStr' shall have 'inputs' inputs and 'nodes' nodes. */
@@ -72,7 +76,7 @@ public class DenseLayer
         for(x = 0; x < n; x++)                                      //  Blank out 'out' array
           out.put(x, 0.0);
 
-        name = nameStr;                                             //  Blank out layer name
+        layerName = nameStr;
       }
 
     /*  New DenseLayer shall have 'inputs' inputs and 'nodes' nodes. */
@@ -179,7 +183,7 @@ public class DenseLayer
 
     public void setName(String nameStr)
       {
-        name = nameStr;
+        layerName = nameStr;
         return;
       }
 
@@ -224,6 +228,52 @@ public class DenseLayer
         System.out.print("]\n");
 
         return;
+      }
+
+    public int inputs()
+      {
+        return i;
+      }
+
+    public int nodes()
+      {
+        return n;
+      }
+
+    public DoubleMatrix weights()
+      {
+        return W;
+      }
+
+    public DoubleMatrix masks()
+      {
+        return M;
+      }
+
+    public int func(int index)
+      {
+        return f[index];
+      }
+
+    public double a(int index)
+      {
+        return alpha[index];
+      }
+
+    public String name()
+      {
+        return layerName;
+      }
+
+    public double[] output()
+      {
+        double oVec[];
+        int i;
+
+        oVec = new double[n];
+        for(i = 0; i < n; i++)
+          oVec[i] = out.get(i);
+        return oVec;
       }
 
     /* Return the layer's output length
@@ -278,5 +328,219 @@ public class DenseLayer
         System.gc();                                                //  Call the garbage collector
 
         return n;                                                   //  Return the length of layer->out
+      }
+
+    public boolean read(DataInputStream fp)
+      {
+        int ctr;
+        boolean mask;
+        byte buffer[];
+
+        try
+          {
+            i = fp.readInt();                                       //  (int) Read number of layer inputs from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read number of Dense Layer inputs.");
+            return false;
+          }
+
+        try
+          {
+            n = fp.readInt();                                       //  (int) Read number of layer nodes from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read number of Dense Layer nodes.");
+            return false;
+          }
+
+        W = new DoubleMatrix(i + 1, n);                             //  (Re)Allocate this layer's weight matrix
+        M = new DoubleMatrix(i + 1, n);                             //  (Re)Allocate this layer's mask matrix
+        f = new int[n];                                             //  (Re)Allocate this layer's function-flag array
+        alpha = new double[n];                                      //  (Re)Allocate this layer's function-parameter array
+        out = new DoubleMatrix(n);                                  //  (Re)Allocate output buffer
+
+        for(ctr = 0; ctr < (i + 1) * n; ctr++)
+          {
+            try
+              {
+                                                                    //  (double) Read layer weights
+                W.put((ctr - (ctr % n)) / n, ctr % n, fp.readDouble());
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read Dense Layer weights.");
+                return false;
+              }
+          }
+
+        for(ctr = 0; ctr < (i + 1) * n; ctr++)
+          {
+            try
+              {
+                mask = fp.readBoolean();                            //  (boolean) Read layer masks
+                if(mask)
+                  M.put((ctr - (ctr % n)) / n, ctr % n, 1.0);
+                else
+                  M.put((ctr - (ctr % n)) / n, ctr % n, 0.0);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read Dense Layer masks.");
+                return false;
+              }
+          }
+
+        for(ctr = 0; ctr < n; ctr++)
+          {
+            try
+              {
+                f[ctr] = (int)fp.readByte();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read Dense Layer activation function flags.");
+                return false;
+              }
+          }
+
+        for(ctr = 0; ctr < n; ctr++)
+          {
+            try
+              {
+                alpha[ctr] = fp.readDouble();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read Dense Layer activation function parameters.");
+                return false;
+              }
+          }
+
+        buffer = new byte[NeuralNet.LAYER_NAME_LEN];
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)
+          {
+            try
+              {
+                buffer[ctr] = fp.readByte();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read Dense Layer name.");
+                return false;
+              }
+          }
+        layerName = new String(buffer, StandardCharsets.UTF_8);     //  Convert byte array to String
+
+        buffer = null;                                              //  Release the array
+        System.gc();                                                //  Call the garbage collector
+
+        return true;
+      }
+
+    public boolean write(DataOutputStream fp)
+      {
+        int ctr;
+        boolean mask;
+        byte buffer[];
+
+        try
+          {
+            fp.writeInt(i);                                         //  (int) Write number of layer inputs to file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write number of Dense Layer inputs.");
+            return false;
+          }
+
+        try
+          {
+            fp.writeInt(n);                                         //  (int) Write number of layer nodes to file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write number of Dense Layer nodes.");
+            return false;
+          }
+
+        for(ctr = 0; ctr < (i + 1) * n; ctr++)
+          {
+            try
+              {
+                                                                    //  (double) Write layer weights
+                fp.writeDouble(W.get((ctr - (ctr % n)) / n, ctr % n));
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Dense Layer weights to file.");
+                return false;
+              }
+          }
+
+        for(ctr = 0; ctr < (i + 1) * n; ctr++)
+          {
+            mask = (M.get((ctr - (ctr % n)) / n, ctr % n)) == 1.0;
+
+            try
+              {
+                fp.writeBoolean(mask);                              //  (boolean) Write layer masks
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Dense Layer masks to file.");
+                return false;
+              }
+          }
+
+        for(ctr = 0; ctr < n; ctr++)
+          {
+            try
+              {
+                fp.writeByte((byte)f[ctr]);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Dense Layer activation function flags to file.");
+                return false;
+              }
+          }
+
+        for(ctr = 0; ctr < n; ctr++)
+          {
+            try
+              {
+                fp.writeDouble(alpha[ctr]);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Dense Layer activation function parameters to file.");
+                return false;
+              }
+          }
+
+        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+          buffer[ctr] = 0x00;
+        buffer = layerName.getBytes(StandardCharsets.UTF_8);        //  Write layer name to file
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+          {
+            try
+              {
+                fp.write(buffer[ctr]);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Dense Layer name to file.");
+                return false;
+              }
+          }
+
+        buffer = null;                                              //  Release the array
+        System.gc();                                                //  Call the garbage collector
+
+        return true;
       }
   }
