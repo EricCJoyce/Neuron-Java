@@ -21,6 +21,11 @@
  Note that this file does NOT seed the randomizer. That should be done by the parent program.
 ***************************************************************************************************/
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
 public class UpresLayer
   {
     public static final int FILL_ZERO   = 0;                        //  Fill strides or pad using zeroes
@@ -33,18 +38,18 @@ public class UpresLayer
 
     private double out[];
     private int outlen;                                             //  Length of the output buffer
-    private String name;
+    private String layerName;
 
-    public Upres(int w, int h, String nameStr)
+    public UpresLayer(int w, int h, String nameStr)
       {
         inputW = w;
         inputH = h;
         n = 0;                                                      //  Initially, no up-ressings
         outlen = 0;                                                 //  And therefore, no output
-        name = nameStr;
+        layerName = nameStr;
       }
 
-    public Upres(int w, int h)
+    public UpresLayer(int w, int h)
       {
         this(w, h, "");
       }
@@ -150,14 +155,14 @@ public class UpresLayer
     /* Set the name of the given Upres Layer */
     public void setName(String nameStr)
       {
-        name = nameStr;
+        layerName = nameStr;
         return;
       }
 
     /* Print the details of the given UpresLayer 'layer' */
     public void print()
       {
-        unsigned int i;
+        int i;
 
         System.out.printf("Input Shape = (%d, %d)\n", inputW, inputH);
 
@@ -188,15 +193,40 @@ public class UpresLayer
         return;
       }
 
+    public int width()
+      {
+        return inputW;
+      }
+
+    public int height()
+      {
+        return inputH;
+      }
+
+    public int numUpres()
+      {
+        return n;
+      }
+
+    public String name()
+      {
+        return layerName;
+      }
+
+    public double[] output()
+      {
+        return out;
+      }
+
     /* Return the layer's output length */
     public int outputLen()
       {
-        int ctr = 0;
         int i;
+        int ctr = 0;
 
         for(i = 0; i < n; i++)
-          ctr += (int)(Math.floor((double)(inputW - filters[i].w + 1) / (double)filters[i].stride_h) *
-                       Math.floor((double)(inputH - filters[i].h + 1) / (double)filters[i].stride_v));
+          ctr += (inputW * (params[i].stride_h + 1) - params[i].stride_h + params[i].padding_h + params[i].padding_h) *
+                 (inputH * (params[i].stride_v + 1) - params[i].stride_v + params[i].padding_v + params[i].padding_v);
 
         return ctr;
       }
@@ -204,7 +234,7 @@ public class UpresLayer
     /* Run the given input vector 'xvec' of length 'inputW' * 'inputH' through the UpresLayer.
        The understanding for this function is that there is only one "color-channel."
        Output is stored internally in layer->out. */
-    public int run_Upres(double[] xvec)
+    public int run(double[] xvec)
       {
         int i;                                                      //  Up-ressing iterator
         int o = 0;                                                  //  Output iterator
@@ -216,7 +246,7 @@ public class UpresLayer
         double a, b;                                                //  Fractional parts of clipped doubles
         double sc_inv_h, sc_inv_v;                                  //  Scaling factors of the inverse transformation
         double val;                                                 //  Stores and compares neighboring pixel influence
-        double* cache;                                              //  The "inner rectangle" we compute first
+        double cache[];                                             //  The "inner rectangle" we compute first
         int ctr;
 
         for(ctr = 0; ctr < outlen; ctr++)                           //  Blank out the output buffer
@@ -231,7 +261,7 @@ public class UpresLayer
             output_w = cache_w + 2 * params[i].padding_h;           //  Compute the shape of the padded rectangle
             output_h = cache_h + 2 * params[i].padding_v;
                                                                     //  Allocate cache for the inner rectangle
-            cache = new double[cache_w * cache_h]
+            cache = new double[cache_w * cache_h];
 
             ctr = 0;                                                //  Reset counter: this now acts as our temporary output iterator
 
@@ -371,7 +401,247 @@ public class UpresLayer
         return outlen;
       }
 
-    private class UpresParams
+    public boolean read(DataInputStream fp)
+      {
+        int ctr;
+        int stride_h, stride_v;
+        int padding_h, padding_v;
+        int sMethod, pMethod;
+        byte buffer[];
+
+        try
+          {
+            inputW = fp.readInt();                                  //  (int) Read layer input width from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read Upres Layer input width.");
+            return false;
+          }
+
+        try
+          {
+            inputH = fp.readInt();                                  //  (int) Read layer input height from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read Upres Layer input height.");
+            return false;
+          }
+
+        try
+          {
+            n = fp.readInt();                                       //  (int) Read number of layer pools from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read number of Upres Layer parameter tuples.");
+            return false;
+          }
+
+        params = new UpresParams[n];                                //  Allocate
+
+        buffer = new byte[NeuralNet.LAYER_NAME_LEN];
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+          buffer[ctr] = 0x00;
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)
+          {
+            try
+              {
+                buffer[ctr] = fp.readByte();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read Upres Layer name.");
+                return false;
+              }
+          }
+        layerName = new String(buffer, StandardCharsets.UTF_8);     //  Convert byte array to String
+        buffer = null;                                              //  Release the array
+
+        for(ctr = 0; ctr < n; ctr++)                                //  For each filter
+          {
+            try
+              {
+                stride_h = fp.readInt();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read up-resolution horizontal stride from file.");
+                return false;
+              }
+            try
+              {
+                stride_v = fp.readInt();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read up-resolution vertical stride from file.");
+                return false;
+              }
+            try
+              {
+                padding_h = fp.readInt();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read up-resolution horizontal padding from file.");
+                return false;
+              }
+            try
+              {
+                padding_v = fp.readInt();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read up-resolution vertical padding from file.");
+                return false;
+              }
+            try
+              {
+                sMethod = (int)fp.readByte();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read up-resolution stride-method flag from file.");
+                return false;
+              }
+            try
+              {
+                pMethod = (int)fp.readByte();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read up-resolution padding-method flag from file.");
+                return false;
+              }
+          }
+
+        outlen = outputLen();
+        out = new double[outlen];
+
+        System.gc();                                                //  Call the garbage collector
+
+        return true;
+      }
+
+    public boolean write(DataOutputStream fp)
+      {
+        int ctr;
+        byte buffer[];
+
+        try
+          {
+            fp.writeInt(inputW);                                    //  (int) Write layer input width to file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write Upres Layer input width.");
+            return false;
+          }
+
+        try
+          {
+            fp.writeInt(inputH);                                    //  (int) Write layer input height from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write Upres Layer input height.");
+            return false;
+          }
+
+        try
+          {
+            fp.writeInt(n);                                         //  (int) Write number of layer pools from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write number of Upres Layer parameter tuples.");
+            return false;
+          }
+
+        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+          buffer[ctr] = 0x00;
+        buffer = layerName.getBytes(StandardCharsets.UTF_8);        //  Write layer name to file
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+          {
+            try
+              {
+                fp.write(buffer[ctr]);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Upres Layer name to file.");
+                return false;
+              }
+          }
+        buffer = null;                                              //  Release the array
+
+        for(ctr = 0; ctr < n; ctr++)
+          {
+            try
+              {
+                fp.writeInt(params[ctr].stride_h);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Upres Layer tuple horizontal stride to file.");
+                return false;
+              }
+            try
+              {
+                fp.writeInt(params[ctr].stride_v);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Upres Layer tuple vertical stride to file.");
+                return false;
+              }
+            try
+              {
+                fp.writeInt(params[ctr].padding_h);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Upres Layer tuple horizontal padding to file.");
+                return false;
+              }
+            try
+              {
+                fp.writeInt(params[ctr].padding_h);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Upres Layer tuple vertical padding to file.");
+                return false;
+              }
+            try
+              {
+                fp.writeByte((byte)params[ctr].sMethod);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Upres Layer tuple stride method flag to file.");
+                return false;
+              }
+            try
+              {
+                fp.writeByte((byte)params[ctr].pMethod);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Upres Layer tuple padding method flag to file.");
+                return false;
+              }
+          }
+
+        System.gc();
+
+        return true;
+      }
+
+    public class UpresParams
       {
         public int stride_h;                                        //  Horizontal Stride: number of columns to put between input columns
         public int stride_v;                                        //  Vertical Stride: number of rows to put between input rows
