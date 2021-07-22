@@ -45,6 +45,7 @@ Similarly, you'd call the Java runtime environment (JRE) like this:
 ```
 java -cp .:/my/sourcecode/directory/jblas-1.2.4.jar MyCode
 ```
+The make-file will compile all the neural network classes for you. The examples included in this repository will contain make-files as well. 
 
 ## Transfer Trained Weights from Keras
 
