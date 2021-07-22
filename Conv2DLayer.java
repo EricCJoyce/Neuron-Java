@@ -19,6 +19,11 @@
  Note that this file does NOT seed the randomizer. That should be done by the parent program.
 ***************************************************************************************************/
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
 public class Conv2DLayer
   {
     private int inputW, inputH;                                     //  Dimensions of the input
@@ -29,7 +34,7 @@ public class Conv2DLayer
     private double out[];                                           //  Output buffer
     private int outlen;                                             //  Length of the output buffer
 
-    private String name;                                            //  Name of this layer
+    private String layerName;                                       //  Name of this layer
 
     /*  Conv2DLayer 'nameStr' shall receive (w x h) input. */
     public Conv2DLayer(int w, int h, String nameStr)
@@ -38,7 +43,7 @@ public class Conv2DLayer
         inputH = h;
         n = 0;                                                      //  New layer initially contains zero filters
         outlen = 0;
-        name = nameStr;
+        layerName = nameStr;
       }
 
     /*  New Conv2DLayer shall receive (w x h) input. */
@@ -155,7 +160,7 @@ public class Conv2DLayer
     /* Set the name of the given Convolutional Layer */
     public void setName(String nameStr)
       {
-        name = nameStr;
+        layerName = nameStr;
         return;
       }
 
@@ -196,6 +201,36 @@ public class Conv2DLayer
             System.out.printf("  Bias:  %.5f\n", filters[i].W[filters[i].h * filters[i].w]);
           }
         return;
+      }
+
+    public int width()
+      {
+        return inputW;
+      }
+
+    public int height()
+      {
+        return inputH;
+      }
+
+    public int numFilters()
+      {
+        return n;
+      }
+
+    public Filter2D filter(int index)
+      {
+        return filters[index];
+      }
+
+    public String name()
+      {
+        return layerName;
+      }
+
+    public double[] output()
+      {
+        return out;
       }
 
     /* Return the layer's output length */
@@ -277,7 +312,278 @@ public class Conv2DLayer
         return outlen;
       }
 
-    private class Filter2D
+    public boolean read(DataInputStream fp)
+      {
+        int ctr, wctr;
+        int w, h, stride_h, stride_v, f;
+        double alpha;
+        byte buffer[];
+
+        try
+          {
+            inputW = fp.readInt();                                  //  (int) Read layer input width from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read Conv2D Layer input width.");
+            return false;
+          }
+
+        try
+          {
+            inputH = fp.readInt();                                  //  (int) Read layer input height from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read Conv2D Layer input height.");
+            return false;
+          }
+
+        try
+          {
+            n = fp.readInt();                                       //  (int) Read number of layer filters from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read number of Conv2D Layer filters.");
+            return false;
+          }
+
+        filters = new Filter2D[n];                                  //  Allocate
+
+        buffer = new byte[NeuralNet.LAYER_NAME_LEN];
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+          buffer[ctr] = 0x00;
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)
+          {
+            try
+              {
+                buffer[ctr] = fp.readByte();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read Conv2D Layer name.");
+                return false;
+              }
+          }
+        layerName = new String(buffer, StandardCharsets.UTF_8);     //  Convert byte array to String
+        buffer = null;                                              //  Release the array
+
+        for(ctr = 0; ctr < n; ctr++)                                //  For each filter
+          {
+            try
+              {
+                w = fp.readInt();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read filter width from file.");
+                return false;
+              }
+            try
+              {
+                h = fp.readInt();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read filter height from file.");
+                return false;
+              }
+            try
+              {
+                stride_h = fp.readInt();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read filter horizontal stride from file.");
+                return false;
+              }
+            try
+              {
+                stride_v = fp.readInt();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read filter vertical stride from file.");
+                return false;
+              }
+            try
+              {
+                f = (int)fp.readByte();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read filter activation function flag from file.");
+                return false;
+              }
+            try
+              {
+                alpha = fp.readDouble();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read filter activation function parameter from file.");
+                return false;
+              }
+
+            filters[ctr] = new Filter2D(w, h);
+            filters[ctr].stride_h = stride_h;
+            filters[ctr].stride_v = stride_v;
+            filters[ctr].f = f;
+            filters[ctr].alpha = alpha;
+
+            for(wctr = 0; wctr < w * h + 1; wctr++)
+              {
+                try
+                  {
+                    filters[ctr].W[wctr] = fp.readDouble();
+                  }
+                catch(IOException ioErr)
+                  {
+                    System.out.println("ERROR: Unable to read filter weights from file.");
+                    return false;
+                  }
+              }
+          }
+
+        outlen = outputLen();
+        out = new double[outlen];
+
+        System.gc();                                                //  Call the garbage collector
+
+        return true;
+      }
+
+    public boolean write(DataOutputStream fp)
+      {
+        int ctr, wctr;
+        byte buffer[];
+
+        try
+          {
+            fp.writeInt(inputW);                                    //  (int) Write layer input width to file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write Conv2D Layer input width.");
+            return false;
+          }
+
+        try
+          {
+            fp.writeInt(inputH);                                    //  (int) Write layer input height to file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write Conv2D Layer input height.");
+            return false;
+          }
+
+        try
+          {
+            fp.writeInt(n);                                         //  (int) Write number of layer filters to file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write number of Conv2D Layer filters.");
+            return false;
+          }
+
+        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+          buffer[ctr] = 0x00;
+        buffer = layerName.getBytes(StandardCharsets.UTF_8);        //  Write layer name to file
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)
+          {
+            try
+              {
+                fp.writeByte(buffer[ctr]);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Conv2D Layer name to file.");
+                return false;
+              }
+          }
+        buffer = null;                                              //  Release the array
+
+        for(ctr = 0; ctr < n; ctr++)                                //  For each filter
+          {
+            try
+              {
+                fp.writeInt(filters[ctr].w);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Conv2D filter width to file.");
+                return false;
+              }
+            try
+              {
+                fp.writeInt(filters[ctr].h);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Conv2D filter height to file.");
+                return false;
+              }
+            try
+              {
+                fp.writeInt(filters[ctr].stride_h);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Conv2D filter horizontal stride to file.");
+                return false;
+              }
+            try
+              {
+                fp.writeInt(filters[ctr].stride_v);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Conv2D filter vertical stride to file.");
+                return false;
+              }
+            try
+              {
+                fp.writeByte((byte)filters[ctr].f);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Conv2D filter activation function flag to file.");
+                return false;
+              }
+            try
+              {
+                fp.writeDouble(filters[ctr].alpha);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Conv2D filter activation function parameter to file.");
+                return false;
+              }
+
+            for(wctr = 0; wctr < filters[ctr].w * filters[ctr].h + 1; wctr++)
+              {
+                try
+                  {
+                    fp.writeDouble(filters[ctr].W[wctr]);
+                  }
+                catch(IOException ioErr)
+                  {
+                    System.out.println("ERROR: Unable to write Conv2D filter weights to file.");
+                    return false;
+                  }
+              }
+          }
+
+        System.gc();                                                //  Call the garbage collector
+
+        return true;
+      }
+
+    public class Filter2D
       {
         public int w;                                               //  Width of the filter
         public int h;                                               //  Height of the filter
