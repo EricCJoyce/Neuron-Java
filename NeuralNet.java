@@ -905,6 +905,7 @@ public class NeuralNet
           {
             for(i = 0; i < denseLen; i++)
               {
+                denselayers[i] = new DenseLayer();                  //  Create one, just to read
                 if(!denselayers[i].read(fp))
                   {
                     System.out.printf("ERROR: Failed to read network dense layer[%d]\n.", i);
@@ -916,6 +917,7 @@ public class NeuralNet
           {
             for(i = 0; i < convLen; i++)
               {
+                convlayers[i] = new Conv2DLayer();                  //  Create one, just to read
                 if(!convlayers[i].read(fp))
                   {
                     System.out.printf("ERROR: Failed to read network convolutional(2D) layer[%d]\n.", i);
@@ -927,6 +929,7 @@ public class NeuralNet
           {
             for(i = 0; i < accumLen; i++)
               {
+                accumlayers[i] = new AccumLayer();                  //  Create one, just to read
                 if(!accumlayers[i].read(fp))
                   {
                     System.out.printf("ERROR: Failed to read network accumulation layer[%d]\n.", i);
@@ -938,6 +941,7 @@ public class NeuralNet
           {
             for(i = 0; i < lstmLen; i++)
               {
+                lstmlayers[i] = new LSTMLayer();                    //  Create one, just to read
                 if(!lstmlayers[i].read(fp))
                   {
                     System.out.printf("ERROR: Failed to read network LSTM layer[%d]\n.", i);
@@ -949,6 +953,7 @@ public class NeuralNet
           {
             for(i = 0; i < gruLen; i++)
               {
+                grulayers[i] = new GRULayer();                      //  Create one, just to read
                 if(!grulayers[i].read(fp))
                   {
                     System.out.printf("ERROR: Failed to read network GRU layer[%d]\n.", i);
@@ -960,6 +965,7 @@ public class NeuralNet
           {
             for(i = 0; i < poolLen; i++)
               {
+                poollayers[i] = new PoolLayer();                    //  Create one, just to read
                 if(!poollayers[i].read(fp))
                   {
                     System.out.printf("ERROR: Failed to read network 2D pooling layer[%d]\n.", i);
@@ -971,6 +977,7 @@ public class NeuralNet
           {
             for(i = 0; i < upresLen; i++)
               {
+                upreslayers[i] = new UpresLayer();                  //  Create one, just to read
                 if(!upreslayers[i].read(fp))
                   {
                     System.out.printf("ERROR: Failed to read network up-resolution layer[%d]\n.", i);
@@ -982,6 +989,7 @@ public class NeuralNet
           {
             for(i = 0; i < normalLen; i++)
               {
+                normlayers[i] = new NormalLayer();                  //  Create one, just to read
                 if(!normlayers[i].read(fp))
                   {
                     System.out.printf("ERROR: Failed to read network normalization layer[%d]\n.", i);
@@ -995,8 +1003,6 @@ public class NeuralNet
           {
             for(j = 0; j < VARSTR_LEN; j++)                         //  Blank out buffer
               byteBuffer[j] = 0x00;
-
-            byteBuffer = new byte[VARSTR_LEN];                      //  Allocate bytes
             for(j = 0; j < VARSTR_LEN; j++)
               {
                 try
@@ -1009,6 +1015,7 @@ public class NeuralNet
                     return false;
                   }
               }
+            variables[i] = new Variable();
                                                                     //  Convert byte array to String
             variables[i].key = new String(byteBuffer, StandardCharsets.UTF_8);
             try
@@ -1190,8 +1197,13 @@ public class NeuralNet
         byteBuffer = new byte[COMMSTR_LEN];                         //  Allocate
         for(i = 0; i < COMMSTR_LEN; i++)                            //  Blank out buffer
           byteBuffer[i] = 0x00;
-        byteBuffer = comment.getBytes(StandardCharsets.UTF_8);      //  Write network comment to file
-        for(i = 0; i < COMMSTR_LEN; i++)                            //  Limit comment
+        i = 0;
+        while(i < COMMSTR_LEN && i < comment.length())              //  Fill in up to limit
+          {
+            byteBuffer[i] = (byte)comment.codePointAt(i);
+            i++;
+          }
+        for(i = 0; i < COMMSTR_LEN; i++)                            //  Write network comment to file
           {
             try
               {
@@ -1419,59 +1431,49 @@ public class NeuralNet
         ArrayList<Edge> addition;                                   //  Track latest addition to sorted list
         ArrayList<Edge> swap;                                       //  Hold Edge objects to be moved
 
-        listlen = denselayers.length + convlayers.length + accumlayers.length +
-                  lstmlayers.length + grulayers.length + poollayers.length + upreslayers.length + normlayers.length + 1;
+        listlen = denseLen + convLen + accumLen + lstmLen + gruLen + poolLen + upresLen + normalLen + 1;
         nodelist = new Node[listlen];                               //  Allocate an array of Nodes (type, index)
-        nodelist[0].type = INPUT_ARRAY;                             //  Set the first Node to the input layer
-        nodelist[0].index = 0;
+        nodelist[0] = new Node(INPUT_ARRAY, 0);                     //  Set the first Node to the input layer
 
         j = 1;
-        for(i = 0; i < denselayers.length; i++)                     //  Add all Dense Layers
+        for(i = 0; i < denseLen; i++)                               //  Add all Dense Layers
           {
-            nodelist[j].type = DENSE_ARRAY;
-            nodelist[j].index = i;
+            nodelist[j] = new Node(DENSE_ARRAY, i);
             j++;
           }
-        for(i = 0; i < convlayers.length; i++)                      //  Add all Convolutional Layers
+        for(i = 0; i < convLen; i++)                                //  Add all Convolutional Layers
           {
-            nodelist[j].type = CONV2D_ARRAY;
-            nodelist[j].index = i;
+            nodelist[j] = new Node(CONV2D_ARRAY, i);
             j++;
           }
-        for(i = 0; i < accumlayers.length; i++)                     //  Add all Accumulator Layers
+        for(i = 0; i < accumLen; i++)                               //  Add all Accumulator Layers
           {
-            nodelist[j].type = ACCUM_ARRAY;
-            nodelist[j].index = i;
+            nodelist[j] = new Node(ACCUM_ARRAY, i);
             j++;
           }
-        for(i = 0; i < lstmlayers.length; i++)                      //  Add all LSTM Layers
+        for(i = 0; i < lstmLen; i++)                                //  Add all LSTM Layers
           {
-            nodelist[j].type = LSTM_ARRAY;
-            nodelist[j].index = i;
+            nodelist[j] = new Node(LSTM_ARRAY, i);
             j++;
           }
-        for(i = 0; i < grulayers.length; i++)                       //  Add all GRU Layers
+        for(i = 0; i < gruLen; i++)                                 //  Add all GRU Layers
           {
-            nodelist[j].type = GRU_ARRAY;
-            nodelist[j].index = i;
+            nodelist[j] = new Node(GRU_ARRAY, i);
             j++;
           }
-        for(i = 0; i < poollayers.length; i++)                      //  Add all Pool Layers
+        for(i = 0; i < poolLen; i++)                                //  Add all Pool Layers
           {
-            nodelist[j].type = POOL_ARRAY;
-            nodelist[j].index = i;
+            nodelist[j] = new Node(POOL_ARRAY, i);
             j++;
           }
-        for(i = 0; i < upreslayers.length; i++)                     //  Add all Upres Layers
+        for(i = 0; i < upresLen; i++)                               //  Add all Upres Layers
           {
-            nodelist[j].type = UPRES_ARRAY;
-            nodelist[j].index = i;
+            nodelist[j] = new Node(UPRES_ARRAY, i);
             j++;
           }
-        for(i = 0; i < normlayers.length; i++)                      //  Add all Normal Layers
+        for(i = 0; i < normalLen; i++)                              //  Add all Normal Layers
           {
-            nodelist[j].type = NORMAL_ARRAY;
-            nodelist[j].index = i;
+            nodelist[j] = new Node(NORMAL_ARRAY, i);
             j++;
           }
 
@@ -1484,7 +1486,7 @@ public class NeuralNet
           {
             j = 0;                                                  //  Try to find an outbound edge from this layer/node
             while(j < len && !(edgelist[j].srcType == nodelist[i].type &&
-                               edgelist[i].srcIndex == nodelist[i].index))
+                               edgelist[j].srcIndex == nodelist[i].index))
               j++;
             if(j == len)                                            //  No outbound edge found:
               {                                                     //  this is a network output layer
@@ -1512,12 +1514,9 @@ public class NeuralNet
                                       swap.get(i).selectorStart, swap.get(i).selectorEnd,
                                       swap.get(i).dstType, swap.get(i).dstIndex));
 
-                newlist[ptr - (swap.size() - 1) + i].srcType = swap.get(i).srcType;
-                newlist[ptr - (swap.size() - 1) + i].srcIndex = swap.get(i).srcIndex;
-                newlist[ptr - (swap.size() - 1) + i].selectorStart = swap.get(i).selectorStart;
-                newlist[ptr - (swap.size() - 1) + i].selectorEnd = swap.get(i).selectorEnd;
-                newlist[ptr - (swap.size() - 1) + i].dstType = swap.get(i).dstType;
-                newlist[ptr - (swap.size() - 1) + i].dstIndex = swap.get(i).dstIndex;
+                newlist[ptr - (swap.size() - 1) + i] = new Edge(swap.get(i).srcType, swap.get(i).srcIndex,
+                                                                swap.get(i).selectorStart, swap.get(i).selectorEnd,
+                                                                swap.get(i).dstType, swap.get(i).dstIndex);
               }
 
             ptr -= swap.size();                                     //  "Advance" pointer (toward head of array)
@@ -1589,51 +1588,51 @@ public class NeuralNet
         int i;
 
         i = 0;                                                      //  Check Dense layers
-        while(i < denselayers.length && !denselayers[i].name().equals(name))
+        while(i < denseLen && !denselayers[i].name().equals(name))
           i++;
-        if(i < denselayers.length)
+        if(i < denseLen)
           return i;
 
         i = 0;                                                      //  Check Conv2D layers
-        while(i < convlayers.length && !convlayers[i].name().equals(name))
+        while(i < convLen && !convlayers[i].name().equals(name))
           i++;
-        if(i < convlayers.length)
+        if(i < convLen)
           return i;
 
         i = 0;                                                      //  Check Accum layers
-        while(i < accumlayers.length && !accumlayers[i].name().equals(name))
+        while(i < accumLen && !accumlayers[i].name().equals(name))
           i++;
-        if(i < accumlayers.length)
+        if(i < accumLen)
           return i;
 
         i = 0;                                                      //  Check LSTM layers
-        while(i < lstmlayers.length && !lstmlayers[i].name().equals(name))
+        while(i < lstmLen && !lstmlayers[i].name().equals(name))
           i++;
-        if(i < lstmlayers.length)
+        if(i < lstmLen)
           return i;
 
         i = 0;                                                      //  Check GRU layers
-        while(i < grulayers.length && !grulayers[i].name().equals(name))
+        while(i < gruLen && !grulayers[i].name().equals(name))
           i++;
-        if(i < grulayers.length)
+        if(i < gruLen)
           return i;
 
         i = 0;                                                      //  Check Pool layers
-        while(i < poollayers.length && !poollayers[i].name().equals(name))
+        while(i < poolLen && !poollayers[i].name().equals(name))
           i++;
-        if(i < poollayers.length)
+        if(i < poolLen)
           return i;
 
         i = 0;                                                      //  Check Upres layers
-        while(i < upreslayers.length && !upreslayers[i].name().equals(name))
+        while(i < upresLen && !upreslayers[i].name().equals(name))
           i++;
-        if(i < upreslayers.length)
+        if(i < upresLen)
           return i;
 
         i = 0;                                                      //  Check Normalization layers
-        while(i < normlayers.length && !normlayers[i].name().equals(name))
+        while(i < normalLen && !normlayers[i].name().equals(name))
           i++;
-        if(i < normlayers.length)
+        if(i < normalLen)
           return i;
 
         return Integer.MAX_VALUE;
@@ -1648,51 +1647,51 @@ public class NeuralNet
         int i;
 
         i = 0;                                                      //  Check Dense layers
-        while(i < denselayers.length && !denselayers[i].name().equals(name))
+        while(i < denseLen && !denselayers[i].name().equals(name))
           i++;
-        if(i < denselayers.length)
+        if(i < denseLen)
           return DENSE_ARRAY;
 
         i = 0;                                                      //  Check Conv2D layers
-        while(i < convlayers.length && !convlayers[i].name().equals(name))
+        while(i < convLen && !convlayers[i].name().equals(name))
           i++;
-        if(i < convlayers.length)
+        if(i < convLen)
           return CONV2D_ARRAY;
 
         i = 0;                                                      //  Check Accum layers
-        while(i < accumlayers.length && !accumlayers[i].name().equals(name))
+        while(i < accumLen && !accumlayers[i].name().equals(name))
           i++;
-        if(i < accumlayers.length)
+        if(i < accumLen)
           return ACCUM_ARRAY;
 
         i = 0;                                                      //  Check LSTM layers
-        while(i < lstmlayers.length && !lstmlayers[i].name().equals(name))
+        while(i < lstmLen && !lstmlayers[i].name().equals(name))
           i++;
-        if(i < lstmlayers.length)
+        if(i < lstmLen)
           return LSTM_ARRAY;
 
         i = 0;                                                      //  Check GRU layers
-        while(i < grulayers.length && !grulayers[i].name().equals(name))
+        while(i < gruLen && !grulayers[i].name().equals(name))
           i++;
-        if(i < grulayers.length)
+        if(i < gruLen)
           return GRU_ARRAY;
 
         i = 0;                                                      //  Check Pool layers
-        while(i < poollayers.length && !poollayers[i].name().equals(name))
+        while(i < poolLen && !poollayers[i].name().equals(name))
           i++;
-        if(i < poollayers.length)
+        if(i < poolLen)
           return POOL_ARRAY;
 
         i = 0;                                                      //  Check Upres layers
-        while(i < upreslayers.length && !upreslayers[i].name().equals(name))
+        while(i < upresLen && !upreslayers[i].name().equals(name))
           i++;
-        if(i < upreslayers.length)
+        if(i < upresLen)
           return UPRES_ARRAY;
 
         i = 0;                                                      //  Check Normalization layers
-        while(i < normlayers.length && !normlayers[i].name().equals(name))
+        while(i < normalLen && !normlayers[i].name().equals(name))
           i++;
-        if(i < normlayers.length)
+        if(i < normalLen)
           return NORMAL_ARRAY;
 
         return Integer.MAX_VALUE;
@@ -1728,11 +1727,11 @@ public class NeuralNet
 
         System.out.println("Layer (type)    Output    Params    IN         OUT");
         System.out.println("===========================================================");
-        for(i = 0; i < denselayers.length; i++)                     //  Print all Dense layers
+        for(i = 0; i < denseLen; i++)                               //  Print all Dense layers
           {
             firstInline = true;
             j = 0;
-            while(j < 9 && denselayers[i].name().codePointAt(j) != 0)
+            while(j < 9 && j < denselayers[i].name().length() && denselayers[i].name().codePointAt(j) != 0)
               {
                 System.out.printf("%c", denselayers[i].name().charAt(j));
                 j++;
@@ -1791,11 +1790,11 @@ public class NeuralNet
 
             System.out.print("\n");
           }
-        for(i = 0; i < convlayers.length; i++)                      //  Print all Convolutional layers
+        for(i = 0; i < convLen; i++)                                //  Print all Convolutional layers
           {
             firstInline = true;
             j = 0;
-            while(j < 9 && convlayers[i].name().codePointAt(j) != 0)
+            while(j < 9 && j < convlayers[i].name().length() && convlayers[i].name().codePointAt(j) != 0)
               {
                 System.out.printf("%c", convlayers[i].name().charAt(j));
                 j++;
@@ -1857,11 +1856,11 @@ public class NeuralNet
 
             System.out.print("\n");
           }
-        for(i = 0; i < accumlayers.length; i++)                     //  Print all Accumulator layers
+        for(i = 0; i < accumLen; i++)                               //  Print all Accumulator layers
           {
             firstInline = true;
             j = 0;
-            while(j < 9 && accumlayers[i].name().codePointAt(j) != 0)
+            while(j < 9 && j < accumlayers[i].name().length() && accumlayers[i].name().codePointAt(j) != 0)
               {
                 System.out.printf("%c", accumlayers[i].name().charAt(j));
                 j++;
@@ -1919,11 +1918,11 @@ public class NeuralNet
 
             System.out.print("\n");
           }
-        for(i = 0; i < lstmlayers.length; i++)                      //  Print all LSTM layers
+        for(i = 0; i < lstmLen; i++)                                //  Print all LSTM layers
           {
             firstInline = true;
             j = 0;
-            while(j < 9 && lstmlayers[i].name().codePointAt(j) != 0)
+            while(j < 9 && j < lstmlayers[i].name().length() && lstmlayers[i].name().codePointAt(j) != 0)
               {
                 System.out.printf("%c", lstmlayers[i].name().charAt(j));
                 j++;
@@ -1984,11 +1983,11 @@ public class NeuralNet
 
             System.out.print("\n");
           }
-        for(i = 0; i < grulayers.length; i++)                       //  Print all GRU layers
+        for(i = 0; i < gruLen; i++)                                 //  Print all GRU layers
           {
             firstInline = true;
             j = 0;
-            while(j < 9 && grulayers[i].name().codePointAt(j) != 0)
+            while(j < 9 && j < grulayers[i].name().length() && grulayers[i].name().codePointAt(j) != 0)
               {
                 System.out.printf("%c", grulayers[i].name().charAt(j));
                 j++;
@@ -2049,11 +2048,11 @@ public class NeuralNet
 
             System.out.print("\n");
           }
-        for(i = 0; i < poollayers.length; i++)                      //  Print all Pool layers
+        for(i = 0; i < poolLen; i++)                                //  Print all Pool layers
           {
             firstInline = true;
             j = 0;
-            while(j < 9 && poollayers[i].name().codePointAt(j) != 0)
+            while(j < 9 && j < poollayers[i].name().length() && poollayers[i].name().codePointAt(j) != 0)
               {
                 System.out.printf("%c", poollayers[i].name().charAt(j));
                 j++;
@@ -2112,11 +2111,11 @@ public class NeuralNet
 
             System.out.print("\n");
           }
-        for(i = 0; i < upreslayers.length; i++)                     //  Print all Upres layers
+        for(i = 0; i < upresLen; i++)                               //  Print all Upres layers
           {
             firstInline = true;
             j = 0;
-            while(j < 9 && upreslayers[i].name().codePointAt(j) != 0)
+            while(j < 9 && j < upreslayers[i].name().length() && upreslayers[i].name().codePointAt(j) != 0)
               {
                 System.out.printf("%c", upreslayers[i].name().charAt(j));
                 j++;
@@ -2175,11 +2174,11 @@ public class NeuralNet
 
             System.out.print("\n");
           }
-        for(i = 0; i < normlayers.length; i++)                      //  Print all Normalization layers
+        for(i = 0; i < normalLen; i++)                              //  Print all Normalization layers
           {
             firstInline = true;
             j = 0;
-            while(j < 9 && normlayers[i].name().codePointAt(j) != 0)
+            while(j < 9 && j < normlayers[i].name().length() && normlayers[i].name().codePointAt(j) != 0)
               {
                 System.out.printf("%c", normlayers[i].name().charAt(j));
                 j++;
@@ -2253,56 +2252,56 @@ public class NeuralNet
             case INPUT_ARRAY:  System.out.print("NETWORK-IN");
                                break;
             case DENSE_ARRAY:  i = 0;
-                               while(i < 9 && denselayers[ index ].name().codePointAt(i) != 0)
+                               while(i < 9 && i < denselayers[ index ].name().length() && denselayers[ index ].name().codePointAt(i) != 0)
                                  {
                                    System.out.printf("%c", denselayers[ index ].name().charAt(i));
                                    i++;
                                  }
                                break;
             case CONV2D_ARRAY: i = 0;
-                               while(i < 9 && convlayers[ index ].name().codePointAt(i) != 0)
+                               while(i < 9 && i < convlayers[ index ].name().length() && convlayers[ index ].name().codePointAt(i) != 0)
                                  {
                                    System.out.printf("%c", convlayers[ index ].name().charAt(i));
                                    i++;
                                  }
                                break;
             case ACCUM_ARRAY:  i = 0;
-                               while(i < 9 && accumlayers[ index ].name().codePointAt(i) != 0)
+                               while(i < 9 && i < accumlayers[ index ].name().length() && accumlayers[ index ].name().codePointAt(i) != 0)
                                  {
                                    System.out.printf("%c", accumlayers[ index ].name().charAt(i));
                                    i++;
                                  }
                                break;
             case LSTM_ARRAY:   i = 0;
-                               while(i < 9 && lstmlayers[ index ].name().codePointAt(i) != 0)
+                               while(i < 9 && i < lstmlayers[ index ].name().length() && lstmlayers[ index ].name().codePointAt(i) != 0)
                                  {
                                    System.out.printf("%c", lstmlayers[ index ].name().charAt(i));
                                    i++;
                                  }
                                break;
             case GRU_ARRAY:    i = 0;
-                               while(i < 9 && grulayers[ index ].name().codePointAt(i) != 0)
+                               while(i < 9 && i < grulayers[ index ].name().length() && grulayers[ index ].name().codePointAt(i) != 0)
                                  {
                                    System.out.printf("%c", grulayers[ index ].name().charAt(i));
                                    i++;
                                  }
                                break;
             case POOL_ARRAY:   i = 0;
-                               while(i < 9 && poollayers[ index ].name().codePointAt(i) != 0)
+                               while(i < 9 && i < poollayers[ index ].name().length() && poollayers[ index ].name().codePointAt(i) != 0)
                                  {
                                    System.out.printf("%c", poollayers[ index ].name().charAt(i));
                                    i++;
                                  }
                                break;
             case UPRES_ARRAY:  i = 0;
-                               while(i < 9 && upreslayers[ index ].name().codePointAt(i) != 0)
+                               while(i < 9 && i < upreslayers[ index ].name().length() && upreslayers[ index ].name().codePointAt(i) != 0)
                                  {
                                    System.out.printf("%c", upreslayers[ index ].name().charAt(i));
                                    i++;
                                  }
                                break;
             case NORMAL_ARRAY: i = 0;
-                               while(i < 9 && normlayers[ index ].name().codePointAt(i) != 0)
+                               while(i < 9 && i < normlayers[ index ].name().length() && normlayers[ index ].name().codePointAt(i) != 0)
                                  {
                                    System.out.printf("%c", normlayers[ index ].name().charAt(i));
                                    i++;
@@ -2312,6 +2311,18 @@ public class NeuralNet
 
         System.out.print("\n");
         return;
+      }
+
+    /* Note that the comment gets cropped to 'COMMSTR_LEN' characters when written to file */
+    public void setComment(String comm)
+      {
+        comment = new String(comm);
+        return;
+      }
+
+    public String getComment()
+      {
+        return comment;
       }
 
     /****************************************************************
@@ -2637,6 +2648,12 @@ public class NeuralNet
           {
             key = k;
             value = v;
+          }
+
+        public Variable()
+          {
+            key = "Var";
+            value = 0.0;
           }
       }
 
