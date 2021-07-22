@@ -53,6 +53,12 @@ public class NormalLayer
         this(numInputs, "");
       }
 
+    /* Use placeholder arguments */
+    public NormalLayer()
+      {
+        this(1, "");
+      }
+
     public void setM(double arg_m)
       {
         m = arg_m;
@@ -265,8 +271,13 @@ public class NormalLayer
         buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
           buffer[ctr] = 0x00;
-        buffer = layerName.getBytes(StandardCharsets.UTF_8);        //  Write layer name to file
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+        ctr = 0;                                                    //  Fill in up to limit
+        while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
+          {
+            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            ctr++;
+          }
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
           {
             try
               {
@@ -274,7 +285,7 @@ public class NormalLayer
               }
             catch(IOException ioErr)
               {
-                System.out.println("ERROR: Unable to write Normalization name to file.");
+                System.out.println("ERROR: Unable to write Normalization Layer name to file.");
                 return false;
               }
           }
