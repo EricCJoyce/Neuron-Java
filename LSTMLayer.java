@@ -149,6 +149,12 @@ public class LSTMLayer
         this(dimInput, dimState, cacheSize, "");
       }
 
+    /* Use placeholder arguments */
+    public LSTMLayer()
+      {
+        this(1, 1, 1, "");
+      }
+
     /* Set the entirety of the Wi matrix using the given array */
     public void setWi(double[] w)
       {
@@ -1092,8 +1098,13 @@ public class LSTMLayer
         buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
           buffer[ctr] = 0x00;
-        buffer = layerName.getBytes(StandardCharsets.UTF_8);        //  Write layer name to file
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+        ctr = 0;                                                    //  Fill in up to limit
+        while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
+          {
+            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            ctr++;
+          }
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
           {
             try
               {
