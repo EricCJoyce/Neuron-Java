@@ -54,6 +54,12 @@ public class UpresLayer
         this(w, h, "");
       }
 
+    /* Use placeholder arguments */
+    public UpresLayer()
+      {
+        this(1, 1, "");
+      }
+
     /* Add an "up-ressing" to an existing UpresLayer.
        The new "up-ressing" shall have stride 'stride' and padding 'padding'. */
     public int addParams(int stride, int padding)
@@ -563,8 +569,13 @@ public class UpresLayer
         buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
           buffer[ctr] = 0x00;
-        buffer = layerName.getBytes(StandardCharsets.UTF_8);        //  Write layer name to file
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+        ctr = 0;                                                    //  Fill in up to limit
+        while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
+          {
+            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            ctr++;
+          }
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
           {
             try
               {
