@@ -17,22 +17,27 @@
  Note that this file does NOT seed the randomizer. That should be done by the parent program.
 ***************************************************************************************************/
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
 public class NormalLayer
   {
-    private int i;                                                  //  Length of the input vector
+    private int i;                                                  //  Length of the input vector (and output vector)
     private double m;                                               //  Mu: the mean learned during training
     private double s;                                               //  Sigma: the standard deviation learned during training
     private double g;                                               //  The factor learned during training
     private double b;                                               //  The constant learned during training
 
     private double out[];
-    private String name;
+    private String layerName;
 
-    public NormalLayer(int inputs)
+    public NormalLayer(int numInputs, String nameStr)
       {
         int ctr;
 
-        i = inputs;
+        i = numInputs;
         m = 0.0;                                                    //  Initialize to no effect:
         s = 1.0;                                                    //  y = g * ((x - m) / s) + b
         g = 1.0;
@@ -40,6 +45,12 @@ public class NormalLayer
         out = new double[i];
         for(ctr = 0; ctr < i; ctr++)                                //  Blank out buffer
           out[ctr] = 0.0;
+        layerName = nameStr;
+      }
+
+    public NormalLayer(int numInputs)
+      {
+        this(numInputs, "");
       }
 
     public void setM(double arg_m)
@@ -68,7 +79,7 @@ public class NormalLayer
 
     public void setName(String nameStr)
       {
-        name = nameStr;
+        layerName = nameStr;
         return;
       }
 
@@ -84,11 +95,192 @@ public class NormalLayer
         return;
       }
 
+    public int inputs()
+      {
+        return i;
+      }
+
+    public double mu()
+      {
+        return m;
+      }
+
+    public double sigma()
+      {
+        return s;
+      }
+
+    public double factor()
+      {
+        return g;
+      }
+
+    public double constant()
+      {
+        return b;
+      }
+
+    public String name()
+      {
+        return layerName;
+      }
+
+    public double[] output()
+      {
+        return out;
+      }
+
     public int run(double[] x)
       {
         int j;
         for(j = 0; j < i; j++)
           out[j] = g * ((x[j] - m) / s) + b;
         return i;
+      }
+
+    public boolean read(DataInputStream fp)
+      {
+        int ctr;
+        byte buffer[];
+
+        try
+          {
+            i = fp.readInt();                                       //  (int) Read number of layer inputs from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read number of Normalization Layer inputs.");
+            return false;
+          }
+        try
+          {
+            m = fp.readDouble();                                    //  (double) Read mu from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read Normalization Layer attribute mu.");
+            return false;
+          }
+        try
+          {
+            s = fp.readDouble();                                    //  (double) Read sigma from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read Normalization Layer attribute sigma.");
+            return false;
+          }
+        try
+          {
+            g = fp.readDouble();                                    //  (double) Read factor from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read Normalization Layer factor.");
+            return false;
+          }
+        try
+          {
+            b = fp.readDouble();                                    //  (double) Read constant from file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read Normalization Layer constant.");
+            return false;
+          }
+
+        buffer = new byte[NeuralNet.LAYER_NAME_LEN];
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+          buffer[ctr] = 0x00;
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)
+          {
+            try
+              {
+                buffer[ctr] = fp.readByte();
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read Normalization Layer name.");
+                return false;
+              }
+          }
+        layerName = new String(buffer, StandardCharsets.UTF_8);     //  Convert byte array to String
+        buffer = null;                                              //  Release the array
+        System.gc();                                                //  Summon the garbage collector
+
+        return true;
+      }
+
+    public boolean write(DataOutputStream fp)
+      {
+        int ctr;
+        byte buffer[];
+
+        try
+          {
+            fp.writeInt(i);                                         //  (int) Write number of layer inputs to file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write number of Normalization Layer inputs.");
+            return false;
+          }
+        try
+          {
+            fp.writeDouble(m);                                      //  (double) Write mu to file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write Normalization Layer attribute mu.");
+            return false;
+          }
+        try
+          {
+            fp.writeDouble(s);                                      //  (double) Write sigma to file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write Normalization Layer attribute sigma.");
+            return false;
+          }
+        try
+          {
+            fp.writeDouble(g);                                      //  (double) Write factor to file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write Normalization Layer factor.");
+            return false;
+          }
+        try
+          {
+            fp.writeDouble(b);                                      //  (double) Write constant to file
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write Normalization Layer constant.");
+            return false;
+          }
+
+        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+          buffer[ctr] = 0x00;
+        buffer = layerName.getBytes(StandardCharsets.UTF_8);        //  Write layer name to file
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+          {
+            try
+              {
+                fp.write(buffer[ctr]);
+              }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to write Normalization name to file.");
+                return false;
+              }
+          }
+        buffer = null;                                              //  Release the array
+        System.gc();                                                //  Summon the garbage collector
+
+        return true;
       }
   }
