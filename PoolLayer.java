@@ -56,6 +56,12 @@ public class PoolLayer
         this(w, h, "");
       }
 
+    /* Use placeholder arguments */
+    public PoolLayer()
+      {
+        this(1, 1, "");
+      }
+
     /* (Re)Set the width of the i-th pool in this layer. */
     public void setW(int w, int i)
       {
@@ -470,8 +476,13 @@ public class PoolLayer
         buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
           buffer[ctr] = 0x00;
-        buffer = layerName.getBytes(StandardCharsets.UTF_8);        //  Write layer name to file
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+        ctr = 0;                                                    //  Fill in up to limit
+        while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
+          {
+            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            ctr++;
+          }
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
           {
             try
               {
