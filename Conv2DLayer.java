@@ -52,6 +52,12 @@ public class Conv2DLayer
         this(w, h, "");
       }
 
+    /* Use placeholder arguments */
+    public Conv2DLayer()
+      {
+        this(1, 1, "");
+      }
+
     /* Add a Filter2D to an existing Conv2DLayer.
        The new filter shall have dimensions 'filterW' by 'filterH'. */
     public int addFilter(int filterW, int filterH)
@@ -492,12 +498,17 @@ public class Conv2DLayer
         buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
           buffer[ctr] = 0x00;
-        buffer = layerName.getBytes(StandardCharsets.UTF_8);        //  Write layer name to file
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)
+        ctr = 0;                                                    //  Fill in up to limit
+        while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
+          {
+            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            ctr++;
+          }
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
           {
             try
               {
-                fp.writeByte(buffer[ctr]);
+                fp.write(buffer[ctr]);
               }
             catch(IOException ioErr)
               {
