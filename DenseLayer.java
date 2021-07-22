@@ -85,9 +85,15 @@ public class DenseLayer
         this(inputs, nodes, "");
       }
 
+    /* Use placeholder arguments */
+    public DenseLayer()
+      {
+        this(1, 1, "");
+      }
+
     /* Set entirety of layer's weight matrix.
        Input buffer 'w' is expected to be ROW-MAJOR even though the internal W is column-major
-            weights W
+            weights W in R^(i+1 * n)
        [ w0  w1  w2  w3  ]
        [ w4  w5  w6  w7  ]
        [ w8  w9  w10 w11 ]
@@ -104,24 +110,27 @@ public class DenseLayer
         return;
       }
 
-    /* Set entirety of weights for i-th column/neuron/unit. */
+    /* Set entirety of weights for index-th column/neuron/unit. */
     public void setW_i(double[] w, int index)
       {
         int ctr;
-        for(ctr = 0; ctr <= i; ctr++)
-          W.put(ctr, index, w[ctr]);
+        if(index < n)
+          {
+            for(ctr = 0; ctr <= i; ctr++)
+              W.put(ctr, index, w[ctr]);
+          }
         return;
       }
 
-    /*  Set element [i, j] of layer's weight matrix */
+    /*  Set weight for unit/column i, weight j */
     public void setW_ij(double w, int index_i, int index_j)
       {
-        if(index_j * n + index_i < (i + 1) * n)
-          W.put(index_i, index_j, w);
+        if(index_j < i + 1 && index_i < n)
+          W.put(index_j, index_i, w);
         return;
       }
 
-    /*  Set entirety of layer's mask matrix */
+    /*  Set entirety of layer's mask matrix (ROW-MAJOR) */
     public void setM(boolean[] m)
       {
         int x, y;
@@ -138,29 +147,32 @@ public class DenseLayer
         return;
       }
 
-    /*  Set entirety of masks for i-th column/neuron/unit */
+    /*  Set entirety of masks for index-th column/neuron/unit */
     public void setM_i(boolean[] m, int index)
       {
         int ctr;
-        for(ctr = 0; ctr <= i; ctr++)
+        if(index < n)
           {
-            if(m[ctr])
-              M.put(ctr, index, 1.0);
-            else
-              M.put(ctr, index, 0.0);
+            for(ctr = 0; ctr <= i; ctr++)
+              {
+                if(m[ctr])
+                  M.put(ctr, index, 1.0);
+                else
+                  M.put(ctr, index, 0.0);
+              }
           }
         return;
       }
 
-    /*  Set element [i, j] of layer's mask matrix */
+    /*  Set mask for unit/column i, weight j */
     public void setM_ij(boolean m, int index_i, int index_j)
       {
-        if(index_j * n + index_i < (i + 1) * n)
+        if(index_j < i + 1 && index_i < n)
           {
             if(m)
-              M.put(index_i, index_j, 1.0);
+              M.put(index_j, index_i, 1.0);
             else
-              M.put(index_i, index_j, 0.0);
+              M.put(index_j, index_i, 0.0);
           }
         return;
       }
@@ -191,13 +203,13 @@ public class DenseLayer
       {
         int x, y;
 
-        for(x = 0; x < i + 1; x++)
+        for(y = 0; y < i + 1; y++)
           {
-            if(x == i)
+            if(y == i)
               System.out.print("bias [");
             else
               System.out.print("     [");
-            for(y = 0; y < n; y++)
+            for(x = 0; x < n; x++)
               {
                 if(W.get(y, x) >= 0.0)
                   System.out.printf(" %.5f ", W.get(y, x));
@@ -288,8 +300,9 @@ public class DenseLayer
     public int run(double[] xvec)
       {
                                                                     //  Input vector augmented with additional (bias) 1.0
-        DoubleMatrix xprime = new DoubleMatrix(i + 1);              //  (1 * (length-of-input + 1))
+        DoubleMatrix xprime = new DoubleMatrix(1, i + 1);           //  (1 * (length-of-input + 1))
         DoubleMatrix Wprime = new DoubleMatrix(i + 1, n);           //  ((length-of-input + 1) * nodes)
+        double denom;
         int x, y;
 
         for(x = 0; x < i; x++)                                      //  Append 1.0 to input vector
@@ -306,20 +319,24 @@ public class DenseLayer
         // len+1 [ A+len+1  A+((len+1)*i)+len+1  A+((len+1)*i)+j ] len+1 [  1        1                    1              ]
         Wprime = W.mul(M);                                          //  Broadcast weights and masks into W'
 
-        out = Wprime.mmul(xprime);                                  //  out = Wprime dot xprime
+        out = xprime.mmul(Wprime);                                  //  out = xprime dot Wprime
+
+        denom = 0.0;
+        for(x = 0; x < n; x++)
+          denom += Math.pow(Math.E, out.get(x));
 
         for(x = 0; x < n; x++)                                      //  Run each element in out through appropriate function
           {                                                         //  with corresponding parameter
             switch(f[x])
               {
-                case ActivationFunction.RELU:                ActivationFunction.relu(out);  break;
-                case ActivationFunction.LEAKY_RELU:          ActivationFunction.leaky_relu(out, alpha);  break;
-                case ActivationFunction.SIGMOID:             ActivationFunction.sigmoid(out, alpha);  break;
-                case ActivationFunction.HYPERBOLIC_TANGENT:  ActivationFunction.tanh(out, alpha);  break;
-                case ActivationFunction.SOFTMAX:             ActivationFunction.softmax(out);  break;
-                case ActivationFunction.SYMMETRICAL_SIGMOID: ActivationFunction.sym_sigmoid(out, alpha);  break;
-                case ActivationFunction.THRESHOLD:           ActivationFunction.threshold(out, alpha);  break;
-                default:                                     ActivationFunction.linear(out, alpha);
+                case ActivationFunction.RELU:                out.put(x, ActivationFunction.relu(out.get(x)));  break;
+                case ActivationFunction.LEAKY_RELU:          out.put(x, ActivationFunction.leaky_relu(out.get(x), alpha[x]));  break;
+                case ActivationFunction.SIGMOID:             out.put(x, ActivationFunction.sigmoid(out.get(x), alpha[x]));  break;
+                case ActivationFunction.HYPERBOLIC_TANGENT:  out.put(x, ActivationFunction.tanh(out.get(x), alpha[x]));  break;
+                case ActivationFunction.SOFTMAX:             out.put(x, ActivationFunction.softmax(out.get(x), denom));  break;
+                case ActivationFunction.SYMMETRICAL_SIGMOID: out.put(x, ActivationFunction.sym_sigmoid(out.get(x), alpha[x]));  break;
+                case ActivationFunction.THRESHOLD:           out.put(x, ActivationFunction.threshold(out.get(x), alpha[x]));  break;
+                default:                                     out.put(x, ActivationFunction.linear(out.get(x), alpha[x]));
               }
           }
 
@@ -524,8 +541,13 @@ public class DenseLayer
         buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
           buffer[ctr] = 0x00;
-        buffer = layerName.getBytes(StandardCharsets.UTF_8);        //  Write layer name to file
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
+        ctr = 0;                                                    //  Fill in up to limit
+        while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
+          {
+            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            ctr++;
+          }
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
           {
             try
               {
