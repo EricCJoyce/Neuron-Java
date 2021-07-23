@@ -22,6 +22,8 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
 public class Conv2DLayer
@@ -323,138 +325,98 @@ public class Conv2DLayer
         int ctr, wctr;
         int w, h, stride_h, stride_v, f;
         double alpha;
-        byte buffer[];
+
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
+
+        allocation = 12 + NeuralNet.LAYER_NAME_LEN;                 //  Allocate space for 3 ints and the layer name
+        byteArr = new byte[allocation];
 
         try
           {
-            inputW = fp.readInt();                                  //  (int) Read layer input width from file
+            fp.read(byteArr);
           }
         catch(IOException ioErr)
           {
-            System.out.println("ERROR: Unable to read Conv2D Layer input width.");
+            System.out.println("ERROR: Unable to read 2D Convolutional Layer header from file.");
             return false;
           }
 
-        try
-          {
-            inputH = fp.readInt();                                  //  (int) Read layer input height from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read Conv2D Layer input height.");
-            return false;
-          }
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer = ByteBuffer.wrap(byteArr);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Read little-endian
 
-        try
-          {
-            n = fp.readInt();                                       //  (int) Read number of layer filters from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of Conv2D Layer filters.");
-            return false;
-          }
+        inputW = byteBuffer.getInt();                               //  (int) Read the input width from file
+        inputH = byteBuffer.getInt();                               //  (int) Read the input height from file
+        n = byteBuffer.getInt();                                    //  (int) Read the number of filters from file
 
-        filters = new Filter2D[n];                                  //  Allocate
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Read into array
+          byteArr[ctr] = byteBuffer.get();
+        layerName = new String(byteArr, StandardCharsets.UTF_8);
 
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
-          buffer[ctr] = 0x00;
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)
-          {
-            try
-              {
-                buffer[ctr] = fp.readByte();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read Conv2D Layer name.");
-                return false;
-              }
-          }
-        layerName = new String(buffer, StandardCharsets.UTF_8);     //  Convert byte array to String
-        buffer = null;                                              //  Release the array
+        filters = new Filter2D[n];                                  //  Allocate filter array
 
         for(ctr = 0; ctr < n; ctr++)                                //  For each filter
           {
+            allocation = 25;                                        //  Allocate space for 4 ints (4 bytes each) + 1 byte + 1 double (8 bytes)
+            byteArr = new byte[allocation];
+
             try
               {
-                w = fp.readInt();
+                fp.read(byteArr);
               }
             catch(IOException ioErr)
               {
-                System.out.println("ERROR: Unable to read filter width from file.");
+                System.out.println("ERROR: Unable to read 2D convolutional filter header from file.");
                 return false;
               }
-            try
-              {
-                h = fp.readInt();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read filter height from file.");
-                return false;
-              }
-            try
-              {
-                stride_h = fp.readInt();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read filter horizontal stride from file.");
-                return false;
-              }
-            try
-              {
-                stride_v = fp.readInt();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read filter vertical stride from file.");
-                return false;
-              }
-            try
-              {
-                f = (int)fp.readByte();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read filter activation function flag from file.");
-                return false;
-              }
-            try
-              {
-                alpha = fp.readDouble();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read filter activation function parameter from file.");
-                return false;
-              }
+
+            byteBuffer = ByteBuffer.allocate(allocation);
+            byteBuffer = ByteBuffer.wrap(byteArr);
+            byteBuffer.order(ByteOrder.LITTLE_ENDIAN);              //  Read little-endian
+
+            w = byteBuffer.getInt();
+            h = byteBuffer.getInt();
+            stride_h = byteBuffer.getInt();
+            stride_v = byteBuffer.getInt();
+            f = byteBuffer.get();
+            alpha = byteBuffer.getDouble();
 
             filters[ctr] = new Filter2D(w, h);
             filters[ctr].stride_h = stride_h;
             filters[ctr].stride_v = stride_v;
-            filters[ctr].f = f;
+            filters[ctr].f = (int)f;
             filters[ctr].alpha = alpha;
 
-            for(wctr = 0; wctr < w * h + 1; wctr++)
+            filters[ctr].W = new double[w * h + 1];                 //  Allocate array of filter weights
+
+            allocation = 8 * (w * h + 1);                           //  Allocate space to read weights
+            byteArr = new byte[allocation];
+
+            try
               {
-                try
-                  {
-                    filters[ctr].W[wctr] = fp.readDouble();
-                  }
-                catch(IOException ioErr)
-                  {
-                    System.out.println("ERROR: Unable to read filter weights from file.");
-                    return false;
-                  }
+                fp.read(byteArr);
               }
+            catch(IOException ioErr)
+              {
+                System.out.println("ERROR: Unable to read 2D convolutional filter weights from file.");
+                return false;
+              }
+
+            byteBuffer = ByteBuffer.allocate(allocation);
+            byteBuffer = ByteBuffer.wrap(byteArr);
+            byteBuffer.order(ByteOrder.LITTLE_ENDIAN);              //  Read little-endian
+
+            for(wctr = 0; wctr < w * h + 1; wctr++)
+              filters[ctr].W[wctr] = byteBuffer.getDouble();
           }
 
         outlen = outputLen();
         out = new double[outlen];
 
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
@@ -463,132 +425,61 @@ public class Conv2DLayer
     public boolean write(DataOutputStream fp)
       {
         int ctr, wctr;
-        byte buffer[];
 
-        try
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
+                                                                    //  Allocate space for
+        allocation = 12 + NeuralNet.LAYER_NAME_LEN;                 //  3 ints and the layer name.
+        for(ctr = 0; ctr < n; ctr++)                                //  Add, for each filter,
           {
-            fp.writeInt(inputW);                                    //  (int) Write layer input width to file
+            allocation += 25;                                       //  4 ints (4 bytes each) + 1 byte + 1 double (8 bytes),
+            allocation += (filters[ctr].w * filters[ctr].h + 1) * 8;//  w*h+1 doubles (8 bytes each).
           }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write Conv2D Layer input width.");
-            return false;
-          }
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Write little-endian
 
-        try
-          {
-            fp.writeInt(inputH);                                    //  (int) Write layer input height to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write Conv2D Layer input height.");
-            return false;
-          }
+        byteBuffer.putInt(inputW);                                  //  (int) Save Conv2DLayer input width to file
+        byteBuffer.putInt(inputH);                                  //  (int) Save Conv2DLayer input height to file
+        byteBuffer.putInt(n);                                       //  (int) Save Conv2DLayer's number of filters to file
 
-        try
-          {
-            fp.writeInt(n);                                         //  (int) Write number of layer filters to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of Conv2D Layer filters.");
-            return false;
-          }
-
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
-          buffer[ctr] = 0x00;
+          byteArr[ctr] = 0x00;
         ctr = 0;                                                    //  Fill in up to limit
         while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
           {
-            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            byteArr[ctr] = (byte)layerName.codePointAt(ctr);
             ctr++;
           }
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
-          {
-            try
-              {
-                fp.write(buffer[ctr]);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Conv2D Layer name to file.");
-                return false;
-              }
-          }
-        buffer = null;                                              //  Release the array
+          byteBuffer.put(byteArr[ctr]);
 
-        for(ctr = 0; ctr < n; ctr++)                                //  For each filter
+        for(ctr = 0; ctr < n; ctr++)                                //  For each filter...
           {
-            try
-              {
-                fp.writeInt(filters[ctr].w);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Conv2D filter width to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeInt(filters[ctr].h);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Conv2D filter height to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeInt(filters[ctr].stride_h);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Conv2D filter horizontal stride to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeInt(filters[ctr].stride_v);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Conv2D filter vertical stride to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeByte((byte)filters[ctr].f);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Conv2D filter activation function flag to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeDouble(filters[ctr].alpha);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Conv2D filter activation function parameter to file.");
-                return false;
-              }
-
+            byteBuffer.putInt(filters[ctr].w);                      //  (int) Save filter width to file
+            byteBuffer.putInt(filters[ctr].h);                      //  (int) Save filter height to file
+            byteBuffer.putInt(filters[ctr].stride_h);               //  (int) Save filter horizontal stride to file
+            byteBuffer.putInt(filters[ctr].stride_v);               //  (int) Save filter vertical stride to file
+            byteBuffer.put((byte)filters[ctr].f);                   //  (byte) Save filter activation function flag to file
+            byteBuffer.putDouble(filters[ctr].alpha);               //  (byte) Save filter function parameter to file
             for(wctr = 0; wctr < filters[ctr].w * filters[ctr].h + 1; wctr++)
-              {
-                try
-                  {
-                    fp.writeDouble(filters[ctr].W[wctr]);
-                  }
-                catch(IOException ioErr)
-                  {
-                    System.out.println("ERROR: Unable to write Conv2D filter weights to file.");
-                    return false;
-                  }
-              }
+              byteBuffer.putDouble(filters[ctr].W[wctr]);           //  (double) Save filter weights to file
           }
 
+        byteArr = byteBuffer.array();
+
+        try
+          {
+            fp.write(byteArr, 0, byteArr.length);
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write 2D Convolutional Layer to file.");
+            return false;
+          }
+
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
