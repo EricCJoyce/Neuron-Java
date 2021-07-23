@@ -30,6 +30,8 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import org.jblas.*;
 import static org.jblas.DoubleMatrix.*;
@@ -351,27 +353,30 @@ public class DenseLayer
       {
         int ctr;
         boolean mask;
-        byte buffer[];
+
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
+
+        allocation = 8;                                             //  Allocate space for 2 ints
+        byteArr = new byte[allocation];
 
         try
           {
-            i = fp.readInt();                                       //  (int) Read number of layer inputs from file
+            fp.read(byteArr);
           }
         catch(IOException ioErr)
           {
-            System.out.println("ERROR: Unable to read number of Dense Layer inputs.");
+            System.out.println("ERROR: Unable to read Dense Layer header from file.");
             return false;
           }
 
-        try
-          {
-            n = fp.readInt();                                       //  (int) Read number of layer nodes from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of Dense Layer nodes.");
-            return false;
-          }
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer = ByteBuffer.wrap(byteArr);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Read little-endian
+
+        i = byteBuffer.getInt();                                    //  (int) Read number of layer inputs from file
+        n = byteBuffer.getInt();                                    //  (int) Read number of layer nodes from file
 
         W = new DoubleMatrix(i + 1, n);                             //  (Re)Allocate this layer's weight matrix
         M = new DoubleMatrix(i + 1, n);                             //  (Re)Allocate this layer's mask matrix
@@ -379,79 +384,50 @@ public class DenseLayer
         alpha = new double[n];                                      //  (Re)Allocate this layer's function-parameter array
         out = new DoubleMatrix(n);                                  //  (Re)Allocate output buffer
 
-        for(ctr = 0; ctr < (i + 1) * n; ctr++)
+        allocation = NeuralNet.LAYER_NAME_LEN +                     //  Allocate space for the layer name,
+                     (i + 1) * n * 8 +                              //  the weight matrix of doubles (8 bytes each),
+                     (i + 1) * n +                                  //  the boolean matrix, represented as bytes,
+                     n + 8 * n;                                     //  and the function-flag array of bytes, and the array of 'n' doubles.
+        byteArr = new byte[allocation];
+
+        try
           {
-            try
-              {
-                                                                    //  (double) Read layer weights
-                W.put((ctr - (ctr % n)) / n, ctr % n, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read Dense Layer weights.");
-                return false;
-              }
+            fp.read(byteArr);
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to read Dense Layer from file.");
+            return false;
           }
 
-        for(ctr = 0; ctr < (i + 1) * n; ctr++)
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer = ByteBuffer.wrap(byteArr);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Read little-endian
+
+        for(ctr = 0; ctr < (i + 1) * n; ctr++)                      //  (double) Read layer weights
+          W.put((ctr - (ctr % n)) / n, ctr % n, byteBuffer.getDouble());
+
+        for(ctr = 0; ctr < (i + 1) * n; ctr++)                      //  (boolean) Read layer masks
           {
-            try
-              {
-                mask = fp.readBoolean();                            //  (boolean) Read layer masks
-                if(mask)
-                  M.put((ctr - (ctr % n)) / n, ctr % n, 1.0);
-                else
-                  M.put((ctr - (ctr % n)) / n, ctr % n, 0.0);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read Dense Layer masks.");
-                return false;
-              }
+            mask = (byteBuffer.get() == (byte)1);
+            if(mask)
+              M.put((ctr - (ctr % n)) / n, ctr % n, 1.0);
+            else
+              M.put((ctr - (ctr % n)) / n, ctr % n, 0.0);
           }
 
-        for(ctr = 0; ctr < n; ctr++)
-          {
-            try
-              {
-                f[ctr] = (int)fp.readByte();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read Dense Layer activation function flags.");
-                return false;
-              }
-          }
+        for(ctr = 0; ctr < n; ctr++)                                //  (byte) Read layer function flags
+          f[ctr] = (int)byteBuffer.get();
 
-        for(ctr = 0; ctr < n; ctr++)
-          {
-            try
-              {
-                alpha[ctr] = fp.readDouble();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read Dense Layer activation function parameters.");
-                return false;
-              }
-          }
+        for(ctr = 0; ctr < n; ctr++)                                //  (double) Read layer function parameters
+          alpha[ctr] = byteBuffer.getDouble();
 
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)
-          {
-            try
-              {
-                buffer[ctr] = fp.readByte();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read Dense Layer name.");
-                return false;
-              }
-          }
-        layerName = new String(buffer, StandardCharsets.UTF_8);     //  Convert byte array to String
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Read into array
+          byteArr[ctr] = byteBuffer.get();
+        layerName = new String(byteArr, StandardCharsets.UTF_8);
 
-        buffer = null;                                              //  Release the array
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
@@ -461,106 +437,61 @@ public class DenseLayer
       {
         int ctr;
         boolean mask;
-        byte buffer[];
 
-        try
-          {
-            fp.writeInt(i);                                         //  (int) Write number of layer inputs to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of Dense Layer inputs.");
-            return false;
-          }
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
+                                                                    //  Allocate space for
+        allocation = 8 + NeuralNet.LAYER_NAME_LEN +                 //  2 ints and the layer name,
+                     (i + 1) * n * 8 +                              //  the weight matrix of doubles (8 bytes each),
+                     (i + 1) * n +                                  //  the boolean matrix, represented as bytes,
+                     n + 8 * n;                                     //  and the function-flag array of bytes, and the array of 'n' doubles.
 
-        try
-          {
-            fp.writeInt(n);                                         //  (int) Write number of layer nodes to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of Dense Layer nodes.");
-            return false;
-          }
+        byteBuffer = ByteBuffer.allocate(allocation);               //  and 1 double (8 bytes each). Also 4 ints and 2 bytes = 18 bytes per edge
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Write little-endian
 
-        for(ctr = 0; ctr < (i + 1) * n; ctr++)
-          {
-            try
-              {
-                                                                    //  (double) Write layer weights
-                fp.writeDouble(W.get((ctr - (ctr % n)) / n, ctr % n));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Dense Layer weights to file.");
-                return false;
-              }
-          }
-
-        for(ctr = 0; ctr < (i + 1) * n; ctr++)
+        byteBuffer.putInt(i);                                       //  (int) Save DenseLayer input count to file
+        byteBuffer.putInt(n);                                       //  (int) Save DenseLayer node count to file
+        for(ctr = 0; ctr < (i + 1) * n; ctr++)                      //  (double) Save DenseLayer weight matrix to file
+          byteBuffer.putDouble(W.get((ctr - (ctr % n)) / n, ctr % n));
+        for(ctr = 0; ctr < (i + 1) * n; ctr++)                      //  (boolean) Save DenseLayer mask matrix to file
           {
             mask = (M.get((ctr - (ctr % n)) / n, ctr % n)) == 1.0;
-
-            try
-              {
-                fp.writeBoolean(mask);                              //  (boolean) Write layer masks
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Dense Layer masks to file.");
-                return false;
-              }
+            if(mask)
+              byteBuffer.put((byte)1);
+            else
+              byteBuffer.put((byte)0);
           }
-
         for(ctr = 0; ctr < n; ctr++)
-          {
-            try
-              {
-                fp.writeByte((byte)f[ctr]);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Dense Layer activation function flags to file.");
-                return false;
-              }
-          }
-
+          byteBuffer.put((byte)f[ctr]);
         for(ctr = 0; ctr < n; ctr++)
-          {
-            try
-              {
-                fp.writeDouble(alpha[ctr]);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Dense Layer activation function parameters to file.");
-                return false;
-              }
-          }
+          byteBuffer.putDouble(alpha[ctr]);
 
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
-          buffer[ctr] = 0x00;
+          byteArr[ctr] = 0x00;
         ctr = 0;                                                    //  Fill in up to limit
         while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
           {
-            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            byteArr[ctr] = (byte)layerName.codePointAt(ctr);
             ctr++;
           }
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
+          byteBuffer.put(byteArr[ctr]);
+
+        byteArr = byteBuffer.array();
+
+        try
           {
-            try
-              {
-                fp.write(buffer[ctr]);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Dense Layer name to file.");
-                return false;
-              }
+            fp.write(byteArr, 0, byteArr.length);
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write Dense Layer to file.");
+            return false;
           }
 
-        buffer = null;                                              //  Release the array
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
