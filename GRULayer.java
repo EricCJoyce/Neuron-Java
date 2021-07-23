@@ -36,6 +36,8 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import org.jblas.*;
 import static org.jblas.DoubleMatrix.*;
@@ -580,182 +582,94 @@ public class GRULayer
     public boolean read(DataInputStream fp)
       {
         int ctr;
-        byte buffer[];
+
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
+
+        allocation = 12;                                            //  Allocate space for 3 ints
+        byteArr = new byte[allocation];
 
         try
           {
-            d = fp.readInt();                                       //  (int) Read dimensionality of layer input from file
+            fp.read(byteArr);
           }
         catch(IOException ioErr)
           {
-            System.out.println("ERROR: Unable to read dimensionality of GRU Layer input.");
+            System.out.println("ERROR: Unable to read GRU Layer header from file.");
             return false;
           }
+
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer = ByteBuffer.wrap(byteArr);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Read little-endian
+
+        d = byteBuffer.getInt();                                    //  (int) Read dimensionality of layer input from file
+        h = byteBuffer.getInt();                                    //  (int) Read dimensionality of layer state from file
+        cache = byteBuffer.getInt();                                //  (int) Read length of layer cache from file
+
+        Wz = new DoubleMatrix(h, d);                                //  (Re)Allocate this layer's Wz matrix
+        Wr = new DoubleMatrix(h, d);                                //  (Re)Allocate this layer's Wr matrix
+        Wh = new DoubleMatrix(h, d);                                //  (Re)Allocate this layer's Wh matrix
+
+        Uz = new DoubleMatrix(h, h);                                //  (Re)Allocate this layer's Uz matrix
+        Ur = new DoubleMatrix(h, h);                                //  (Re)Allocate this layer's Ur matrix
+        Uh = new DoubleMatrix(h, h);                                //  (Re)Allocate this layer's Uh matrix
+
+        bz = new DoubleMatrix(h);                                   //  (Re)Allocate this layer's bz vector
+        br = new DoubleMatrix(h);                                   //  (Re)Allocate this layer's br vector
+        bh = new DoubleMatrix(h);                                   //  (Re)Allocate this layer's bh vector
+
+        H = new DoubleMatrix(h, cache);                             //  (Re)Allocate this newest layer's cache matrix
+
+        allocation = (h * d + h * h + h) * 24 +                     //  Allocate space for all weight matrices and the layer name
+                     NeuralNet.LAYER_NAME_LEN;
+        byteArr = new byte[allocation];
 
         try
           {
-            h = fp.readInt();                                       //  (int) Read dimensionality of layer state from file
+            fp.read(byteArr);
           }
         catch(IOException ioErr)
           {
-            System.out.println("ERROR: Unable to read dimensionality of GRU Layer state.");
+            System.out.println("ERROR: Unable to read GRU Layer weights from file.");
             return false;
           }
 
-        try
-          {
-            cache = fp.readInt();                                    //  (int) Read length of layer cache from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read length of GRU Layer cache.");
-            return false;
-          }
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer = ByteBuffer.wrap(byteArr);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Read little-endian
 
-        Wz = new DoubleMatrix(h, d);                                //  (Re)Allocate
-        Wr = new DoubleMatrix(h, d);
-        Wh = new DoubleMatrix(h, d);
-
-        Uz = new DoubleMatrix(h, h);                                //  (Re)Allocate
-        Ur = new DoubleMatrix(h, h);
-        Uh = new DoubleMatrix(h, h);
-
-        bz = new DoubleMatrix(h);                                   //  (Re)Allocate
-        br = new DoubleMatrix(h);
-        bh = new DoubleMatrix(h);
-
-        H = new DoubleMatrix(h, cache);
-
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Read Wz (d * h doubles)
-          {
-            try
-              {
-                Wz.put((ctr - (ctr % d)) / d, ctr % d, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read GRU Layer Wz weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Read Wr (d * h doubles)
-          {
-            try
-              {
-                Wr.put((ctr - (ctr % d)) / d, ctr % d, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read GRU Layer Wr weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Read Wh (d * h doubles)
-          {
-            try
-              {
-                Wh.put((ctr - (ctr % d)) / d, ctr % d, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read GRU Layer Wh weights.");
-                return false;
-              }
-          }
+        for(ctr = 0; ctr < d * h; ctr++)                            //  Read Wz (h * d doubles)
+          Wz.put((ctr - (ctr % d)) / d, ctr % d, byteBuffer.getDouble());
+        for(ctr = 0; ctr < d * h; ctr++)                            //  Read Wr (h * d doubles)
+          Wr.put((ctr - (ctr % d)) / d, ctr % d, byteBuffer.getDouble());
+        for(ctr = 0; ctr < d * h; ctr++)                            //  Read Wh (h * d doubles)
+          Wh.put((ctr - (ctr % d)) / d, ctr % d, byteBuffer.getDouble());
 
         for(ctr = 0; ctr < h * h; ctr++)                            //  Read Uz (h * h doubles)
-          {
-            try
-              {
-                Uz.put((ctr - (ctr % h)) / h, ctr % h, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read GRU Layer Uz weights.");
-                return false;
-              }
-          }
+          Uz.put((ctr - (ctr % h)) / h, ctr % h, byteBuffer.getDouble());
         for(ctr = 0; ctr < h * h; ctr++)                            //  Read Ur (h * h doubles)
-          {
-            try
-              {
-                Ur.put((ctr - (ctr % h)) / h, ctr % h, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read GRU Layer Ur weights.");
-                return false;
-              }
-          }
+          Ur.put((ctr - (ctr % h)) / h, ctr % h, byteBuffer.getDouble());
         for(ctr = 0; ctr < h * h; ctr++)                            //  Read Uh (h * h doubles)
-          {
-            try
-              {
-                Uh.put((ctr - (ctr % h)) / h, ctr % h, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read GRU Layer Uh weights.");
-                return false;
-              }
-          }
+          Uh.put((ctr - (ctr % h)) / h, ctr % h, byteBuffer.getDouble());
 
         for(ctr = 0; ctr < h; ctr++)                                //  Read bz (h doubles)
-          {
-            try
-              {
-                bz.put(ctr, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read GRU Layer bz weights.");
-                return false;
-              }
-          }
+          bz.put(ctr, byteBuffer.getDouble());
         for(ctr = 0; ctr < h; ctr++)                                //  Read br (h doubles)
-          {
-            try
-              {
-                br.put(ctr, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read GRU Layer br weights.");
-                return false;
-              }
-          }
+          br.put(ctr, byteBuffer.getDouble());
         for(ctr = 0; ctr < h; ctr++)                                //  Read bh (h doubles)
-          {
-            try
-              {
-                bh.put(ctr, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read GRU Layer bh weights.");
-                return false;
-              }
-          }
+          bh.put(ctr, byteBuffer.getDouble());
 
         for(ctr = 0; ctr < h * cache; ctr++)                        //  Blank out H matrix
           H.put((ctr - (ctr % cache)) / cache, ctr % cache, 0.0);
 
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Read layerName (NeuralNet.LAYER_NAME_LEN chars)
-          {
-            try
-              {
-                buffer[ctr] = fp.readByte();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read GRU Layer name.");
-                return false;
-              }
-          }
-        layerName = new String(buffer, StandardCharsets.UTF_8);     //  Convert byte array to String
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Read into array
+          byteArr[ctr] = byteBuffer.get();
+        layerName = new String(byteArr, StandardCharsets.UTF_8);
 
-        buffer = null;                                              //  Release the array
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
@@ -764,172 +678,68 @@ public class GRULayer
     public boolean write(DataOutputStream fp)
       {
         int ctr;
-        byte buffer[];
 
-        try
-          {
-            fp.writeInt(d);                                         //  (int) Write dimensionality of layer input to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write dimensionality of GRU Layer input.");
-            return false;
-          }
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
+                                                                    //  Allocate space for
+        allocation = 12 + NeuralNet.LAYER_NAME_LEN +                //  3 ints and the layer name,
+                     3 * d * h * 8 +                                //  3*d*h doubles at 8 bytes each,
+                     3 * h * h * 8 +                                //  3*h*h doubles at 8 bytes each,
+                     3 * h * 8;                                     //  3*h doubles at 8 bytes each.
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Write little-endian
 
-        try
-          {
-            fp.writeInt(h);                                         //  (int) Write dimensionality of layer state to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write dimensionality of GRU Layer state.");
-            return false;
-          }
+        byteBuffer.putInt(d);                                       //  (int) Save GRULayer's input dimensionality to file
+        byteBuffer.putInt(h);                                       //  (int) Save GRULayer's state dimensionality to file
+        byteBuffer.putInt(cache);                                   //  (int) Save length of GRULayer's cache to file
 
-        try
-          {
-            fp.writeInt(cache);                                     //  (int) Write length of layer cache to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write length of GRU Layer cache.");
-            return false;
-          }
+        for(ctr = 0; ctr < d * h; ctr++)                            //  (double) Save the ROW-MAJOR Wz matrix to file
+          byteBuffer.putDouble(Wz.get((ctr - (ctr % d)) / d, ctr % d));
+        for(ctr = 0; ctr < d * h; ctr++)                            //  (double) Save the ROW-MAJOR Wr matrix to file
+          byteBuffer.putDouble(Wr.get((ctr - (ctr % d)) / d, ctr % d));
+        for(ctr = 0; ctr < d * h; ctr++)                            //  (double) Save the ROW-MAJOR Wh matrix to file
+          byteBuffer.putDouble(Wh.get((ctr - (ctr % d)) / d, ctr % d));
 
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Write Wz (d * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Wz.get((ctr - (ctr % d)) / d, ctr % d));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write GRU Layer Wz weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Write Wr (d * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Wr.get((ctr - (ctr % d)) / d, ctr % d));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write GRU Layer Wr weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Write Wh (d * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Wh.get((ctr - (ctr % d)) / d, ctr % d));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write GRU Layer Wh weights.");
-                return false;
-              }
-          }
+        for(ctr = 0; ctr < h * h; ctr++)                            //  (double) Save the ROW-MAJOR Uz matrix to file
+          byteBuffer.putDouble(Uz.get((ctr - (ctr % h)) / h, ctr % h));
+        for(ctr = 0; ctr < h * h; ctr++)                            //  (double) Save the ROW-MAJOR Ur matrix to file
+          byteBuffer.putDouble(Ur.get((ctr - (ctr % h)) / h, ctr % h));
+        for(ctr = 0; ctr < h * h; ctr++)                            //  (double) Save the ROW-MAJOR Uh matrix to file
+          byteBuffer.putDouble(Uh.get((ctr - (ctr % h)) / h, ctr % h));
 
-        for(ctr = 0; ctr < h * h; ctr++)                            //  Write Uz (h * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Uz.get((ctr - (ctr % h)) / h, ctr % h));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write GRU Layer Uz weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * h; ctr++)                            //  Write Ur (h * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Ur.get((ctr - (ctr % h)) / h, ctr % h));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write GRU Layer Ur weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * h; ctr++)                            //  Write Uh (h * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Uh.get((ctr - (ctr % h)) / h, ctr % h));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write GRU Layer Uh weights.");
-                return false;
-              }
-          }
+        for(ctr = 0; ctr < h; ctr++)                                //  (double) Save the bz vector to file
+          byteBuffer.putDouble(bz.get(ctr));
+        for(ctr = 0; ctr < h; ctr++)                                //  (double) Save the br vector to file
+          byteBuffer.putDouble(br.get(ctr));
+        for(ctr = 0; ctr < h; ctr++)                                //  (double) Save the bh vector to file
+          byteBuffer.putDouble(bh.get(ctr));
 
-        for(ctr = 0; ctr < h; ctr++)                                //  Write bz (h doubles)
-          {
-            try
-              {
-                fp.writeDouble(bz.get(ctr));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write GRU Layer bz weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h; ctr++)                                //  Write br (h doubles)
-          {
-            try
-              {
-                fp.writeDouble(br.get(ctr));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write GRU Layer br weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h; ctr++)                                //  Write bh (h doubles)
-          {
-            try
-              {
-                fp.writeDouble(bh.get(ctr));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write GRU Layer bh weights.");
-                return false;
-              }
-          }
-
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
-          buffer[ctr] = 0x00;
+          byteArr[ctr] = 0x00;
         ctr = 0;                                                    //  Fill in up to limit
         while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
           {
-            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            byteArr[ctr] = (byte)layerName.codePointAt(ctr);
             ctr++;
           }
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
+          byteBuffer.put(byteArr[ctr]);
+
+        byteArr = byteBuffer.array();
+
+        try
           {
-            try
-              {
-                fp.write(buffer[ctr]);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write GRU Layer name to file.");
-                return false;
-              }
+            fp.write(byteArr, 0, byteArr.length);
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write GRU Layer to file.");
+            return false;
           }
 
-        buffer = null;                                              //  Release the array
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
