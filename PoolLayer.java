@@ -25,6 +25,8 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
 public class PoolLayer
@@ -324,115 +326,74 @@ public class PoolLayer
       {
         int ctr;
         int w, h, stride_h, stride_v, f;
-        byte buffer[];
+
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
+
+        allocation = 12 + NeuralNet.LAYER_NAME_LEN;                 //  Allocate space for 3 ints and the layer name
+        byteArr = new byte[allocation];
 
         try
           {
-            inputW = fp.readInt();                                  //  (int) Read layer input width from file
+            fp.read(byteArr);
           }
         catch(IOException ioErr)
           {
-            System.out.println("ERROR: Unable to read Pool Layer input width.");
+            System.out.println("ERROR: Unable to read 2D Pooling Layer header from file.");
             return false;
           }
 
-        try
-          {
-            inputH = fp.readInt();                                  //  (int) Read layer input height from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read Pool Layer input height.");
-            return false;
-          }
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer = ByteBuffer.wrap(byteArr);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Read little-endian
 
-        try
-          {
-            n = fp.readInt();                                       //  (int) Read number of layer pools from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of Pool Layer pools.");
-            return false;
-          }
+        inputW = byteBuffer.getInt();                               //  (int) Read the input width from file
+        inputH = byteBuffer.getInt();                               //  (int) Read the input height from file
+        n = byteBuffer.getInt();                                    //  (int) Read the number of pools from file
 
-        pools = new Pool2D[n];                                      //  Allocate
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Read into array
+          byteArr[ctr] = byteBuffer.get();
+        layerName = new String(byteArr, StandardCharsets.UTF_8);
 
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
-          buffer[ctr] = 0x00;
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)
-          {
-            try
-              {
-                buffer[ctr] = fp.readByte();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read Pool Layer name.");
-                return false;
-              }
-          }
-        layerName = new String(buffer, StandardCharsets.UTF_8);     //  Convert byte array to String
-        buffer = null;                                              //  Release the array
+        pools = new Pool2D[n];                                      //  Allocate pool array
 
         for(ctr = 0; ctr < n; ctr++)                                //  For each filter
           {
+            allocation = 17;                                        //  Allocate space for 4 ints (4 bytes each) + 1 byte
+            byteArr = new byte[allocation];
+
             try
               {
-                w = fp.readInt();
+                fp.read(byteArr);
               }
             catch(IOException ioErr)
               {
-                System.out.println("ERROR: Unable to read pool width from file.");
+                System.out.println("ERROR: Unable to read 2D pool from file.");
                 return false;
               }
-            try
-              {
-                h = fp.readInt();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read pool height from file.");
-                return false;
-              }
-            try
-              {
-                stride_h = fp.readInt();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read pool horizontal stride from file.");
-                return false;
-              }
-            try
-              {
-                stride_v = fp.readInt();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read pool vertical stride from file.");
-                return false;
-              }
-            try
-              {
-                f = (int)fp.readByte();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read pooling function flag from file.");
-                return false;
-              }
+
+            byteBuffer = ByteBuffer.allocate(allocation);
+            byteBuffer = ByteBuffer.wrap(byteArr);
+            byteBuffer.order(ByteOrder.LITTLE_ENDIAN);              //  Read little-endian
+
+            w = byteBuffer.getInt();
+            h = byteBuffer.getInt();
+            stride_h = byteBuffer.getInt();
+            stride_v = byteBuffer.getInt();
+            f = byteBuffer.get();
 
             pools[ctr] = new Pool2D(w, h);
             pools[ctr].stride_h = stride_h;
             pools[ctr].stride_v = stride_v;
-            pools[ctr].f = f;
+            pools[ctr].f = (int)f;
           }
 
         outlen = outputLen();
         out = new double[outlen];
 
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
@@ -441,110 +402,54 @@ public class PoolLayer
     public boolean write(DataOutputStream fp)
       {
         int ctr;
-        byte buffer[];
 
-        try
-          {
-            fp.writeInt(inputW);                                    //  (int) Write layer input width to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write Pool Layer input width.");
-            return false;
-          }
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
 
-        try
-          {
-            fp.writeInt(inputH);                                    //  (int) Write layer input height from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write Pool Layer input height.");
-            return false;
-          }
+        allocation = 12 + NeuralNet.LAYER_NAME_LEN +                //  3 ints and the layer name,
+                     17 * n;                                        //  plus 17 bytes per pooling (4 ints @ 4 bytes apiece + 1 byte).
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Write little-endian
 
-        try
-          {
-            fp.writeInt(n);                                         //  (int) Write number of layer pools from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of Pool Layer pools.");
-            return false;
-          }
+        byteBuffer.putInt(inputW);                                  //  (int) Save Pooling Layer's input width to file
+        byteBuffer.putInt(inputH);                                  //  (int) Save Pooling Layer's input height to file
+        byteBuffer.putInt(n);                                       //  (int) Save number of Pooling Layer's pools to file
 
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
-          buffer[ctr] = 0x00;
+          byteArr[ctr] = 0x00;
         ctr = 0;                                                    //  Fill in up to limit
         while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
           {
-            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            byteArr[ctr] = (byte)layerName.codePointAt(ctr);
             ctr++;
           }
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
-          {
-            try
-              {
-                fp.write(buffer[ctr]);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Pooling Layer name to file.");
-                return false;
-              }
-          }
-        buffer = null;                                              //  Release the array
+          byteBuffer.put(byteArr[ctr]);
 
-        for(ctr = 0; ctr < n; ctr++)
+        for(ctr = 0; ctr < n; ctr++)                                //  For each pool...
           {
-            try
-              {
-                fp.writeInt(pools[ctr].w);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Pooling Layer pool width to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeInt(pools[ctr].h);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Pooling Layer pool height to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeInt(pools[ctr].stride_h);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Pooling Layer pool horizontal stride to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeInt(pools[ctr].stride_v);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Pooling Layer pool vertical stride to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeByte((byte)pools[ctr].f);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Pooling Layer pool function flag to file.");
-                return false;
-              }
+            byteBuffer.putInt(pools[ctr].w);                        //  (int) Save pool width to file
+            byteBuffer.putInt(pools[ctr].h);                        //  (int) Save pool height to file
+            byteBuffer.putInt(pools[ctr].stride_h);                 //  (int) Save pool horizontal stride to file
+            byteBuffer.putInt(pools[ctr].stride_v);                 //  (int) Save pool vertical stride to file
+            byteBuffer.put((byte)pools[ctr].f);                     //  (byte) Save pool function flag to file
           }
 
+        byteArr = byteBuffer.array();
+
+        try
+          {
+            fp.write(byteArr, 0, byteArr.length);
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write 2D Pooling Layer to file.");
+            return false;
+          }
+
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
