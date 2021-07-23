@@ -13,6 +13,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 
@@ -660,9 +662,14 @@ public class NeuralNet
     public boolean load(String filename)
       {
         DataInputStream fp;
-        byte byteBuffer[];
+
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
+
         byte srcType, dstType;
         int srcIndex, selectorStart, selectorEnd, dstIndex;
+        double val;
         int i, j;
 
         try
@@ -675,229 +682,102 @@ public class NeuralNet
             return false;
           }
 
-        try
-          {
-            inputs = fp.readInt();                                  //  (int) Read NeuralNet input count from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of network inputs from file.");
-            return false;
-          }
+        allocation = 53 + COMMSTR_LEN;                              //  Allocate space for 11 ints (4 bytes each), COMMSTR_LEN + 1 byte,
+        byteArr = new byte[allocation];                             //  and 1 double (8 bytes each).
 
         try
           {
-            len = fp.readInt();
-            if(len > 0)
-              edgelist = new Edge[len];                             //  (int) Read NeuralNet edge count from file
+            fp.read(byteArr);
           }
         catch(IOException ioErr)
           {
-            System.out.println("ERROR: Unable to read number of network edges from file.");
+            System.out.println("ERROR: Unable to read network header from file.");
             return false;
           }
+
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer = ByteBuffer.wrap(byteArr);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Read little-endian
+
+        inputs = byteBuffer.getInt();                               //  (int) Read NeuralNet input count from file
+        len = byteBuffer.getInt();                                  //  (int) Read NeuralNet edge count from file
+        if(len > 0)
+          edgelist = new Edge[len];                                 //  Allocate edge list
+
+        denseLen = byteBuffer.getInt();                             //  (int) Read number of Dense Layers from file
+        if(denseLen > 0)
+          denselayers = new DenseLayer[denseLen];                   //  Allocate Dense Layers array
+
+        convLen = byteBuffer.getInt();                              //  (int) Read number of Convolutional Layers from file
+        if(convLen > 0)
+          convlayers = new Conv2DLayer[convLen];                    //  Allocate 2D Convolutional Layers array
+
+        accumLen = byteBuffer.getInt();                             //  (int) Read number of Accumulation Layers from file
+        if(accumLen > 0)
+          accumlayers = new AccumLayer[accumLen];                   //  Allocate Accumulator Layers array
+
+        lstmLen = byteBuffer.getInt();                              //  (int) Read number of LSTM Layers from file
+        if(lstmLen > 0)
+          lstmlayers = new LSTMLayer[lstmLen];                      //  Allocate LSTM Layers array
+
+        gruLen = byteBuffer.getInt();                               //  (int) Read number of GRU Layers from file
+        if(gruLen > 0)
+          grulayers = new GRULayer[gruLen];                         //  Allocate GRU Layers array
+
+        poolLen = byteBuffer.getInt();                              //  (int) Read number of Pooling Layers from file
+        if(poolLen > 0)
+          poollayers = new PoolLayer[poolLen];                      //  Allocate Pooling Layers array
+
+        upresLen = byteBuffer.getInt();                             //  (int) Read number of Up-resolution Layers from file
+        if(upresLen > 0)
+          upreslayers = new UpresLayer[upresLen];                   //  Allocate Up-resolution Layers array
+
+        normalLen = byteBuffer.getInt();                            //  (int) Read number of Normalization Layers from file
+        if(normalLen > 0)
+          normlayers = new NormalLayer[normalLen];                  //  Allocate Normalization Layers array
+
+        vars = (int)byteBuffer.get();                               //  (byte) Read number of Variables from file
+        if(vars > 0)
+          variables = new Variable[vars];                           //  Allocate array of network Variables
+
+        gen = byteBuffer.getInt();                                  //  (int) Read network generation/epoch from file
+        fit = byteBuffer.getDouble();                               //  (double) Read network fitness from file
+
+        byteArr = new byte[COMMSTR_LEN];                            //  Allocate
+        for(i = 0; i < COMMSTR_LEN; i++)                            //  Read into array
+          byteArr[i] = byteBuffer.get();
+        comment = new String(byteArr, StandardCharsets.UTF_8);
+
+        byteBuffer.clear();                                         //  Reset the buffer
+
+        allocation = len * 18;                                      //  Allocate 18 bytes per edge (4 ints + 2 bytes)
+        byteArr = new byte[allocation];                             //  and 1 double (8 bytes each).
 
         try
           {
-            denseLen = fp.readInt();
-            if(denseLen > 0)
-              denselayers = new DenseLayer[denseLen];               //  (int) Read number of Dense Layers from file
+            fp.read(byteArr);
           }
         catch(IOException ioErr)
           {
-            System.out.println("ERROR: Unable to read number of dense layers from file.");
+            System.out.println("ERROR: Unable to read network edge list from file.");
             return false;
           }
 
-        try
-          {
-            convLen = fp.readInt();
-            if(convLen > 0)
-              convlayers = new Conv2DLayer[convLen];                //  (int) Read number of Convolutional Layers from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of convolutional layers from file.");
-            return false;
-          }
-
-        try
-          {
-            accumLen = fp.readInt();
-            if(accumLen > 0)
-              accumlayers = new AccumLayer[accumLen];               //  (int) Read number of Accumulator Layers from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of accumulator layers from file.");
-            return false;
-          }
-
-        try
-          {
-            lstmLen = fp.readInt();
-            if(lstmLen > 0)
-              lstmlayers = new LSTMLayer[lstmLen];                  //  (int) Read number of LSTM Layers from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of LSTM layers from file.");
-            return false;
-          }
-
-        try
-          {
-            gruLen = fp.readInt();
-            if(gruLen > 0)
-              grulayers = new GRULayer[gruLen];                     //  (int) Read number of GRU Layers from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of GRU layers from file.");
-            return false;
-          }
-
-        try
-          {
-            poolLen = fp.readInt();
-            if(poolLen > 0)
-              poollayers = new PoolLayer[poolLen];                  //  (int) Read number of Pool Layers from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of pooling layers from file.");
-            return false;
-          }
-
-        try
-          {
-            upresLen = fp.readInt();
-            if(upresLen > 0)
-              upreslayers = new UpresLayer[upresLen];               //  (int) Read number of Upres Layers from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of up-resolution layers from file.");
-            return false;
-          }
-
-        try
-          {
-            normalLen = fp.readInt();
-            if(normalLen > 0)
-              normlayers = new NormalLayer[normalLen];              //  (int) Read number of Normal Layers from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of normalization layers from file.");
-            return false;
-          }
-
-        try
-          {
-            vars = (int)fp.readByte();
-            if(vars > 0)
-              variables = new Variable[vars];                       //  (char) Read number of variables from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read number of network variables from file.");
-            return false;
-          }
-
-        try
-          {
-            gen = fp.readInt();                                     //  (int) Read generation/epoch from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read network generation/epoch from file.");
-            return false;
-          }
-
-        try
-          {
-            fit = fp.readDouble();                                  //  (double) Read network fitness from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read network fitness from file.");
-            return false;
-          }
-
-        byteBuffer = new byte[COMMSTR_LEN];                         //  Allocate byte array
-        for(i = 0; i < COMMSTR_LEN; i++)                            //  Blank out buffer
-          byteBuffer[i] = 0x00;
-        for(i = 0; i < COMMSTR_LEN; i++)                            //  Read in full amount (can include NULLs)
-          {
-            try
-              {
-                byteBuffer[i] = fp.readByte();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read network comment from file.");
-                return false;
-              }
-          }
-        comment = new String(byteBuffer, StandardCharsets.UTF_8);   //  Convert byte array to String
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer = ByteBuffer.wrap(byteArr);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Read little-endian
 
         for(i = 0; i < len; i++)                                    //  Read all Edges from file
           {
-            try
-              {
-                srcType = fp.readByte();                            //  (char) Read edge source type from file
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read network edge list (source type byte) from file.");
-                return false;
-              }
-            try
-              {
-                srcIndex = fp.readInt();                            //  (int) Read edge source index from file
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read network edge list (source index) from file.");
-                return false;
-              }
-            try
-              {
-                selectorStart = fp.readInt();                       //  (int) Read edge selector start from file
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read network edge list (selector start) from file.");
-                return false;
-              }
-            try
-              {
-                selectorEnd = fp.readInt();                         //  (int) Read edge selector end from file
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read network edge list (selector end) from file.");
-                return false;
-              }
-            try
-              {
-                dstType = fp.readByte();                            //  (char) Read edge destination type from file
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read network edge list (destination type byte) from file.");
-                return false;
-              }
-            try
-              {
-                dstIndex = fp.readInt();                            //  (int) Read edge destination index from file
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read network edge list (destination index) from file.");
-                return false;
-              }
+            srcType = byteBuffer.get();                             //  (byte) Read edge source type from file
+            srcIndex = byteBuffer.getInt();                         //  (int) Read edge source index from file
+
+            selectorStart = byteBuffer.getInt();                    //  (int) Read edge selector start from file
+            selectorEnd = byteBuffer.getInt();                      //  (int) Read edge selector end from file
+
+            dstType = byteBuffer.get();                             //  (byte) Read edge destination type from file
+            dstIndex = byteBuffer.getInt();                         //  (int) Read edge destination index from file
+
             edgelist[i] = new Edge((int)srcType, srcIndex, selectorStart, selectorEnd, (int)dstType, dstIndex);
           }
 
@@ -998,48 +878,39 @@ public class NeuralNet
               }
           }
 
-        byteBuffer = new byte[VARSTR_LEN];                          //  Re-allocate buffer
-        for(i = 0; i < vars; i++)                                   //  Write all Variables to file
+        byteBuffer.clear();                                         //  Reset the buffer
+
+        allocation = vars * (VARSTR_LEN + 8);                       //  Allocate space for each network variable to be accumulated from file
+        if(allocation > 0)
           {
-            for(j = 0; j < VARSTR_LEN; j++)                         //  Blank out buffer
-              byteBuffer[j] = 0x00;
-            for(j = 0; j < VARSTR_LEN; j++)
-              {
-                try
-                  {
-                    byteBuffer[j] = fp.readByte();                  //  Read full length
-                  }
-                catch(IOException ioErr)
-                  {
-                    System.out.println("ERROR: Unable to read network variable key from file.");
-                    return false;
-                  }
-              }
-            variables[i] = new Variable();
-                                                                    //  Convert byte array to String
-            variables[i].key = new String(byteBuffer, StandardCharsets.UTF_8);
+            byteArr = new byte[allocation];
+
             try
               {
-                variables[i].value = fp.readDouble();
+                fp.read(byteArr);
               }
             catch(IOException ioErr)
               {
-                System.out.println("ERROR: Unable to read network variable key from file.");
+                System.out.println("ERROR: Unable to read network variables from file.");
                 return false;
+              }
+
+            byteBuffer = ByteBuffer.allocate(allocation);
+            byteBuffer = ByteBuffer.wrap(byteArr);
+            byteBuffer.order(ByteOrder.LITTLE_ENDIAN);              //  Read little-endian
+
+            byteArr = new byte[VARSTR_LEN];                         //  Re-allocate
+            for(i = 0; i < vars; i++)
+              {
+                for(j = 0; j < VARSTR_LEN; j++)                     //  Read into buffer
+                  byteArr[j] = byteBuffer.get();
+                val = byteBuffer.getDouble();
+
+                variables[i] = new Variable(new String(byteArr, StandardCharsets.UTF_8), val);
               }
           }
 
-        try
-          {
-            fp.close();
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to close file.");
-            return false;
-          }
-
-        byteBuffer = null;                                          //  Release array
+        byteArr = null;                                             //  Release array
         System.gc();                                                //  Summon the garbage collector
 
         return true;
@@ -1049,9 +920,9 @@ public class NeuralNet
     public boolean write(String filename)
       {
         DataOutputStream fp;
-        byte byteBuffer[];
-        byte srcType, dstType;
-        int srcIndex, selectorStart, selectorEnd, dstIndex;
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
         int i, j;
 
         try
@@ -1064,223 +935,58 @@ public class NeuralNet
             return false;
           }
 
-        try
-          {
-            fp.writeInt(inputs);                                    //  (int) Save NeuralNet input count to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of network inputs to file.");
-            return false;
-          }
+        allocation = 53 + COMMSTR_LEN + len * 18;                   //  Allocate space for 11 ints (4 bytes each), COMMSTR_LEN + 1 byte,
+        byteBuffer = ByteBuffer.allocate(allocation);               //  and 1 double (8 bytes each). Also 4 ints and 2 bytes = 18 bytes per edge
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Write little-endian
 
-        try
-          {
-            fp.writeInt(len);                                       //  (int) Save NeuralNet edge count to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of network edges to file.");
-            return false;
-          }
+        byteBuffer.putInt(inputs);                                  //  (int) Save NeuralNet input count to file
+        byteBuffer.putInt(len);                                     //  (int) Save NeuralNet edge count to file
+        byteBuffer.putInt(denseLen);                                //  (int) Save number of Dense Layers to file
+        byteBuffer.putInt(convLen);                                 //  (int) Save number of Convolutional Layers to file
+        byteBuffer.putInt(accumLen);                                //  (int) Save number of Accumulation Layers to file
+        byteBuffer.putInt(lstmLen);                                 //  (int) Save number of LSTM Layers to file
+        byteBuffer.putInt(gruLen);                                  //  (int) Save number of GRU Layers to file
+        byteBuffer.putInt(poolLen);                                 //  (int) Save number of Pooling Layers to file
+        byteBuffer.putInt(upresLen);                                //  (int) Save number of Up-resolution Layers to file
+        byteBuffer.putInt(normalLen);                               //  (int) Save number of Normalization Layers to file
+        byteBuffer.put((byte)vars);                                 //  (byte) Save number of Variables to file
+        byteBuffer.putInt(gen);                                     //  (int) Save network generation/epoch to file
+        byteBuffer.putDouble(fit);                                  //  (double) Save network fitness to file
 
-        try
-          {
-            fp.writeInt(denseLen);                                  //  (int) Save number of Dense Layers to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of network dense layers to file.");
-            return false;
-          }
-
-        try
-          {
-            fp.writeInt(convLen);                                   //  (int) Save number of Convolutional Layers to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of network convolutional layers to file.");
-            return false;
-          }
-
-        try
-          {
-            fp.writeInt(accumLen);                                  //  (int) Save number of Accumulator Layers to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of network accumulator layers to file.");
-            return false;
-          }
-
-        try
-          {
-            fp.writeInt(lstmLen);                                   //  (int) Save number of LSTM Layers to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of network LSTM layers to file.");
-            return false;
-          }
-
-        try
-          {
-            fp.writeInt(gruLen);                                    //  (int) Save number of GRU Layers to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of network GRU layers to file.");
-            return false;
-          }
-
-        try
-          {
-            fp.writeInt(poolLen);                                   //  (int) Save number of Pool Layers to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of network pooling layers to file.");
-            return false;
-          }
-
-        try
-          {
-            fp.writeInt(upresLen);                                  //  (int) Save number of Upres Layers to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of network up-resolution layers to file.");
-            return false;
-          }
-
-        try
-          {
-            fp.writeInt(normalLen);                                 //  (int) Save number of Normal Layers to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of network normalization layers to file.");
-            return false;
-          }
-
-        try
-          {
-            fp.write(vars);                                         //  (char) Save number of Variables to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of network variables to file.");
-            return false;
-          }
-
-        try
-          {
-            fp.writeInt(gen);                                       //  (int) Save generation/epoch to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write network generation/epoch to file.");
-            return false;
-          }
-
-        try
-          {
-            fp.writeDouble(fit);                                    //  (double) Save fitness to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write network fitness to file.");
-            return false;
-          }
-
-        byteBuffer = new byte[COMMSTR_LEN];                         //  Allocate
+        byteArr = new byte[COMMSTR_LEN];                            //  Allocate
         for(i = 0; i < COMMSTR_LEN; i++)                            //  Blank out buffer
-          byteBuffer[i] = 0x00;
+          byteArr[i] = 0x00;
         i = 0;
         while(i < COMMSTR_LEN && i < comment.length())              //  Fill in up to limit
           {
-            byteBuffer[i] = (byte)comment.codePointAt(i);
+            byteArr[i] = (byte)comment.codePointAt(i);
             i++;
           }
         for(i = 0; i < COMMSTR_LEN; i++)                            //  Write network comment to file
-          {
-            try
-              {
-                fp.write(byteBuffer[i]);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write network comment to file.");
-                return false;
-              }
-          }
+          byteBuffer.put(byteArr[i]);
 
         for(i = 0; i < len; i++)                                    //  Write all Edges to file
           {
-            srcType = (byte)edgelist[i].srcType;                    //  (char) Save edge source type to file
-            srcIndex = edgelist[i].srcIndex;                        //  (int) Save edge source index to file
+            byteBuffer.put((byte)edgelist[i].srcType);              //  (byte) Save edge source type to file
+            byteBuffer.putInt(edgelist[i].srcIndex);                //  (int) Save edge source index to file
 
-            selectorStart = edgelist[i].selectorStart;              //  (int) Save edge selector start to file
-            selectorEnd = edgelist[i].selectorEnd;                  //  (int) Save edge selector end to file
+            byteBuffer.putInt(edgelist[i].selectorStart);           //  (int) Save edge selector start to file
+            byteBuffer.putInt(edgelist[i].selectorEnd);             //  (int) Save edge selector end to file
 
-            dstType = (byte)edgelist[i].dstType;                    //  (char) Save edge destination type to file
-            dstIndex = edgelist[i].dstIndex;                        //  (int) Save edge destination index to file
+            byteBuffer.put((byte)edgelist[i].dstType);              //  (byte) Save edge destination type to file
+            byteBuffer.putInt(edgelist[i].dstIndex);                //  (int) Save edge destination index to file
+          }
 
-            try
-              {
-                fp.write(srcType);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write network edge list (source type byte) to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeInt(srcIndex);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write network edge list (source index) to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeInt(selectorStart);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write network edge list (selector start) to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeInt(selectorEnd);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write network edge list (selector end) to file.");
-                return false;
-              }
-            try
-              {
-                fp.write(dstType);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write network edge list (destination type byte) to file.");
-                return false;
-              }
-            try
-              {
-                fp.writeInt(dstIndex);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write network edge list (destination index) to file.");
-                return false;
-              }
+        byteArr = byteBuffer.array();
+
+        try
+          {
+            fp.write(byteArr, 0, byteArr.length);
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write network header to file.");
+            return false;
           }
 
         if(denseLen > 0)
@@ -1372,32 +1078,40 @@ public class NeuralNet
               }
           }
 
-        byteBuffer = new byte[VARSTR_LEN];                          //  Re-allocate array
-        for(i = 0; i < vars; i++)                                   //  Write all Variables to file
+        byteBuffer.clear();                                         //  Reset the buffer
+
+        allocation = vars * (VARSTR_LEN + 8);                       //  Allocate space for each network variable to be accumulated and written to file
+        if(allocation > 0)
           {
-            for(j = 0; j < VARSTR_LEN; j++)                         //  Blank out array
-              byteBuffer[j] = 0x00;
-                                                                    //  Convert string to byte array
-            byteBuffer = variables[i].key.getBytes(StandardCharsets.UTF_8);
-            for(j = 0; j < VARSTR_LEN; j++)                         //  Limit variable key name
+            byteBuffer = ByteBuffer.allocate(allocation);
+
+            byteArr = new byte[VARSTR_LEN];                         //  Re-allocate
+            for(i = 0; i < vars; i++)
               {
-                try
+                for(j = 0; j < VARSTR_LEN; j++)                     //  Blank out buffer
+                  byteArr[j] = 0x00;
+                j = 0;
+                                                                    //  Fill in up to limit
+                while(j < VARSTR_LEN && j < variables[i].key.length())
                   {
-                    fp.write(byteBuffer[j]);
+                    byteArr[j] = (byte)variables[i].key.codePointAt(j);
+                    j++;
                   }
-                catch(IOException ioErr)
-                  {
-                    System.out.println("ERROR: Unable to write network variable key to file.");
-                    return false;
-                  }
+                for(j = 0; j < VARSTR_LEN; j++)                     //  Write network comment to file
+                  byteBuffer.put(byteArr[i]);
+
+                byteBuffer.putDouble(variables[i].value);
               }
+
+            byteArr = byteBuffer.array();
+
             try
               {
-                fp.writeDouble(variables[i].value);
+                fp.write(byteArr, 0, byteArr.length);
               }
             catch(IOException ioErr)
               {
-                System.out.println("ERROR: Unable to write network variable value to file.");
+                System.out.println("ERROR: Unable to write network variables to file.");
                 return false;
               }
           }
@@ -1412,7 +1126,7 @@ public class NeuralNet
             return false;
           }
 
-        byteBuffer = null;                                          //  Release array
+        byteArr = null;                                             //  Release array
         System.gc();                                                //  Summon the garbage collector
 
         return true;
@@ -1725,6 +1439,7 @@ public class NeuralNet
         boolean firstInline;
         StringBuffer buffer;
 
+        System.out.println(comment);
         System.out.println("Layer (type)    Output    Params    IN         OUT");
         System.out.println("===========================================================");
         for(i = 0; i < denseLen; i++)                               //  Print all Dense layers
