@@ -13,6 +13,7 @@ public class XorExample
     public static void main(String[] args)
       {
         NeuralNet nn;
+        NeuralNet nn2;
         double in[];
         double out[];
 
@@ -82,36 +83,41 @@ public class XorExample
         nn = null;                                                  //  Destroy the network
         System.gc();                                                //  Call the garbage collector
 
-        System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+        System.out.println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
 
-        nn = new NeuralNet(2);                                      //  (Re) Initialize
-        nn.load("xor.nn");                                          //  Load the network we just wrote to file
+        nn2 = new NeuralNet(2);                                     //  Initialize
+        nn2.load("xor.nn");                                         //  Load the network we just wrote to file
+        nn2.dense(0).print();                                       //  Show me the layers retrieved from file
+        nn2.dense(1).print();
+        nn2.printEdgeList();                                        //  Show me all the connections
+
+        nn2.print();
 
         in[0] = 1.0;                                                //  Check that these produce the same outputs
         in[1] = 0.0;
-        out = nn.run(in);
+        out = nn2.run(in);
         System.out.printf("%f %f\n", in[0], in[1]);
         System.out.printf("%f\n\n", out[0]);
 
         in[0] = 1.0;
         in[1] = 1.0;
-        out = nn.run(in);
+        out = nn2.run(in);
         System.out.printf("%f %f\n", in[0], in[1]);
         System.out.printf("%f\n\n", out[0]);
 
         in[0] = 0.0;
         in[1] = 0.0;
-        out = nn.run(in);
+        out = nn2.run(in);
         System.out.printf("%f %f\n", in[0], in[1]);
         System.out.printf("%f\n\n", out[0]);
 
         in[0] = 0.0;
         in[1] = 1.0;
-        out = nn.run(in);
+        out = nn2.run(in);
         System.out.printf("%f %f\n", in[0], in[1]);
         System.out.printf("%f\n\n", out[0]);
 
-        nn = null;                                                  //  Clean up
+        nn2 = null;                                                 //  Clean up
         System.gc();                                                //  Call the garbage collector
 
         return;
