@@ -36,6 +36,8 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import org.jblas.*;
 import static org.jblas.DoubleMatrix.*;
@@ -689,202 +691,94 @@ public class LSTMLayer
     public boolean read(DataInputStream fp)
       {
         int ctr;
-        byte buffer[];
+
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
+
+        allocation = 12;                                            //  Allocate space for 3 ints
+        byteArr = new byte[allocation];
 
         try
           {
-            d = fp.readInt();                                       //  (int) Read dimensionality of layer input from file
+            fp.read(byteArr);
           }
         catch(IOException ioErr)
           {
-            System.out.println("ERROR: Unable to read dimensionality of LSTM Layer input.");
+            System.out.println("ERROR: Unable to read LSTM Layer header from file.");
             return false;
           }
+
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer = ByteBuffer.wrap(byteArr);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Read little-endian
+
+        d = byteBuffer.getInt();                                    //  (int) Read dimensionality of layer input from file
+        h = byteBuffer.getInt();                                    //  (int) Read dimensionality of layer state from file
+        cache = byteBuffer.getInt();                                //  (int) Read length of layer cache from file
+
+        Wi = new DoubleMatrix(h, d);                                //  (Re)Allocate this layer's Wi matrix
+        Wo = new DoubleMatrix(h, d);                                //  (Re)Allocate this layer's Wo matrix
+        Wf = new DoubleMatrix(h, d);                                //  (Re)Allocate this layer's Wf matrix
+        Wc = new DoubleMatrix(h, d);                                //  (Re)Allocate this layer's Wc matrix
+
+        Ui = new DoubleMatrix(h, h);                                //  (Re)Allocate this layer's Ui matrix
+        Uo = new DoubleMatrix(h, h);                                //  (Re)Allocate this layer's Uo matrix
+        Uf = new DoubleMatrix(h, h);                                //  (Re)Allocate this layer's Uf matrix
+        Uc = new DoubleMatrix(h, h);                                //  (Re)Allocate this layer's Uc matrix
+
+        bi = new DoubleMatrix(h);                                   //  (Re)Allocate this layer's bi vector
+        bo = new DoubleMatrix(h);                                   //  (Re)Allocate this layer's bo vector
+        bf = new DoubleMatrix(h);                                   //  (Re)Allocate this layer's bf vector
+        bc = new DoubleMatrix(h);                                   //  (Re)Allocate this layer's bc vector
+
+        c = new DoubleMatrix(h);                                    //  (Re)Allocate this newest layer's c vector
+        H = new DoubleMatrix(h, cache);                             //  (Re)Allocate this newest layer's cache matrix
+
+        allocation = (h * d + h * h + h) * 32 +                     //  Allocate space for all weight matrices and the layer name
+                     NeuralNet.LAYER_NAME_LEN;
+        byteArr = new byte[allocation];
 
         try
           {
-            h = fp.readInt();                                       //  (int) Read dimensionality of layer state from file
+            fp.read(byteArr);
           }
         catch(IOException ioErr)
           {
-            System.out.println("ERROR: Unable to read dimensionality of LSTM Layer state.");
+            System.out.println("ERROR: Unable to read LSTM Layer weights from file.");
             return false;
           }
 
-        try
-          {
-            cache = fp.readInt();                                    //  (int) Read length of layer cache from file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to read length of LSTM Layer cache.");
-            return false;
-          }
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer = ByteBuffer.wrap(byteArr);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Read little-endian
 
-        Wi = new DoubleMatrix(h, d);                                //  (Re)Allocate
-        Wo = new DoubleMatrix(h, d);
-        Wf = new DoubleMatrix(h, d);
-        Wc = new DoubleMatrix(h, d);
-
-        Ui = new DoubleMatrix(h, h);                                //  (Re)Allocate
-        Uo = new DoubleMatrix(h, h);
-        Uf = new DoubleMatrix(h, h);
-        Uc = new DoubleMatrix(h, h);
-
-        bi = new DoubleMatrix(h);                                   //  (Re)Allocate
-        bo = new DoubleMatrix(h);
-        bf = new DoubleMatrix(h);
-        bc = new DoubleMatrix(h);
-
-        c = new DoubleMatrix(h);
-        H = new DoubleMatrix(h, cache);
-
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Read Wi (d * h doubles)
-          {
-            try
-              {
-                Wi.put((ctr - (ctr % d)) / d, ctr % d, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer Wi weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Read Wo (d * h doubles)
-          {
-            try
-              {
-                Wo.put((ctr - (ctr % d)) / d, ctr % d, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer Wo weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Read Wf (d * h doubles)
-          {
-            try
-              {
-                Wf.put((ctr - (ctr % d)) / d, ctr % d, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer Wf weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Read Wc (d * h doubles)
-          {
-            try
-              {
-                Wc.put((ctr - (ctr % d)) / d, ctr % d, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer Wc weights.");
-                return false;
-              }
-          }
+        for(ctr = 0; ctr < d * h; ctr++)                            //  Read Wi (h * d doubles)
+          Wi.put((ctr - (ctr % d)) / d, ctr % d, byteBuffer.getDouble());
+        for(ctr = 0; ctr < d * h; ctr++)                            //  Read Wo (h * d doubles)
+          Wo.put((ctr - (ctr % d)) / d, ctr % d, byteBuffer.getDouble());
+        for(ctr = 0; ctr < d * h; ctr++)                            //  Read Wf (h * d doubles)
+          Wf.put((ctr - (ctr % d)) / d, ctr % d, byteBuffer.getDouble());
+        for(ctr = 0; ctr < d * h; ctr++)                            //  Read Wc (h * d doubles)
+          Wc.put((ctr - (ctr % d)) / d, ctr % d, byteBuffer.getDouble());
 
         for(ctr = 0; ctr < h * h; ctr++)                            //  Read Ui (h * h doubles)
-          {
-            try
-              {
-                Ui.put((ctr - (ctr % h)) / h, ctr % h, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer Ui weights.");
-                return false;
-              }
-          }
+          Ui.put((ctr - (ctr % h)) / h, ctr % h, byteBuffer.getDouble());
         for(ctr = 0; ctr < h * h; ctr++)                            //  Read Uo (h * h doubles)
-          {
-            try
-              {
-                Uo.put((ctr - (ctr % h)) / h, ctr % h, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer Uo weights.");
-                return false;
-              }
-          }
+          Uo.put((ctr - (ctr % h)) / h, ctr % h, byteBuffer.getDouble());
         for(ctr = 0; ctr < h * h; ctr++)                            //  Read Uf (h * h doubles)
-          {
-            try
-              {
-                Uf.put((ctr - (ctr % h)) / h, ctr % h, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer Uf weights.");
-                return false;
-              }
-          }
+          Uf.put((ctr - (ctr % h)) / h, ctr % h, byteBuffer.getDouble());
         for(ctr = 0; ctr < h * h; ctr++)                            //  Read Uc (h * h doubles)
-          {
-            try
-              {
-                Uc.put((ctr - (ctr % h)) / h, ctr % h, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer Uc weights.");
-                return false;
-              }
-          }
+          Uc.put((ctr - (ctr % h)) / h, ctr % h, byteBuffer.getDouble());
 
         for(ctr = 0; ctr < h; ctr++)                                //  Read bi (h doubles)
-          {
-            try
-              {
-                bi.put(ctr, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer bi weights.");
-                return false;
-              }
-          }
+          bi.put(ctr, byteBuffer.getDouble());
         for(ctr = 0; ctr < h; ctr++)                                //  Read bo (h doubles)
-          {
-            try
-              {
-                bo.put(ctr, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer bo weights.");
-                return false;
-              }
-          }
+          bo.put(ctr, byteBuffer.getDouble());
         for(ctr = 0; ctr < h; ctr++)                                //  Read bf (h doubles)
-          {
-            try
-              {
-                bf.put(ctr, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer bf weights.");
-                return false;
-              }
-          }
+          bf.put(ctr, byteBuffer.getDouble());
         for(ctr = 0; ctr < h; ctr++)                                //  Read bc (h doubles)
-          {
-            try
-              {
-                bc.put(ctr, fp.readDouble());
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer bc weights.");
-                return false;
-              }
-          }
+          bc.put(ctr, byteBuffer.getDouble());
 
         for(ctr = 0; ctr < h; ctr++)                                //  Blank out c vector
           c.put(ctr, 0.0);
@@ -892,22 +786,12 @@ public class LSTMLayer
         for(ctr = 0; ctr < h * cache; ctr++)                        //  Blank out H matrix
           H.put((ctr - (ctr % cache)) / cache, ctr % cache, 0.0);
 
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Read layerName (NeuralNet.LAYER_NAME_LEN chars)
-          {
-            try
-              {
-                buffer[ctr] = fp.readByte();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read LSTM Layer name.");
-                return false;
-              }
-          }
-        layerName = new String(buffer, StandardCharsets.UTF_8);     //  Convert byte array to String
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Read into array
+          byteArr[ctr] = byteBuffer.get();
+        layerName = new String(byteArr, StandardCharsets.UTF_8);
 
-        buffer = null;                                              //  Release the array
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
@@ -918,206 +802,73 @@ public class LSTMLayer
         int ctr;
         byte buffer[];
 
-        try
-          {
-            fp.writeInt(d);                                         //  (int) Write dimensionality of layer input to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write dimensionality of LSTM Layer input.");
-            return false;
-          }
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
 
-        try
-          {
-            fp.writeInt(h);                                         //  (int) Write dimensionality of layer state to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write dimensionality of LSTM Layer state.");
-            return false;
-          }
+        allocation = 12 + NeuralNet.LAYER_NAME_LEN +                //  3 ints and the layer name,
+                     4 * d * h * 8 +                                //  4*d*h doubles at 8 bytes each,
+                     4 * h * h * 8 +                                //  4*h*h doubles at 8 bytes each,
+                     4 * h * 8;                                     //  4*h doubles at 8 bytes each.
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Write little-endian
 
-        try
-          {
-            fp.writeInt(cache);                                     //  (int) Write length of layer cache to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write length of LSTM Layer cache.");
-            return false;
-          }
+        byteBuffer.putInt(d);                                       //  (int) Save LSTMLayer's input dimensionality to file
+        byteBuffer.putInt(h);                                       //  (int) Save LSTMLayer's state dimensionality to file
+        byteBuffer.putInt(cache);                                   //  (int) Save length of LSTMLayer's cache to file
 
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Write Wi (d * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Wi.get((ctr - (ctr % d)) / d, ctr % d));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer Wi weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Write Wo (d * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Wo.get((ctr - (ctr % d)) / d, ctr % d));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer Wo weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Write Wf (d * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Wf.get((ctr - (ctr % d)) / d, ctr % d));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer Wf weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * d; ctr++)                            //  Write Wc (d * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Wc.get((ctr - (ctr % d)) / d, ctr % d));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer Wc weights.");
-                return false;
-              }
-          }
+        for(ctr = 0; ctr < d * h; ctr++)                            //  (double) Save the ROW-MAJOR Wi matrix to file
+          byteBuffer.putDouble(Wi.get((ctr - (ctr % d)) / d, ctr % d));
+        for(ctr = 0; ctr < d * h; ctr++)                            //  (double) Save the ROW-MAJOR Wo matrix to file
+          byteBuffer.putDouble(Wo.get((ctr - (ctr % d)) / d, ctr % d));
+        for(ctr = 0; ctr < d * h; ctr++)                            //  (double) Save the ROW-MAJOR Wf matrix to file
+          byteBuffer.putDouble(Wf.get((ctr - (ctr % d)) / d, ctr % d));
+        for(ctr = 0; ctr < d * h; ctr++)                            //  (double) Save the ROW-MAJOR Wc matrix to file
+          byteBuffer.putDouble(Wc.get((ctr - (ctr % d)) / d, ctr % d));
 
-        for(ctr = 0; ctr < h * h; ctr++)                            //  Write Ui (h * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Ui.get((ctr - (ctr % h)) / h, ctr % h));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer Ui weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * h; ctr++)                            //  Write Uo (h * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Uo.get((ctr - (ctr % h)) / h, ctr % h));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer Uo weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * h; ctr++)                            //  Write Uf (h * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Uf.get((ctr - (ctr % h)) / h, ctr % h));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer Uf weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h * h; ctr++)                            //  Write Uc (h * h doubles)
-          {
-            try
-              {
-                fp.writeDouble(Uc.get((ctr - (ctr % h)) / h, ctr % h));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer Uc weights.");
-                return false;
-              }
-          }
+        for(ctr = 0; ctr < h * h; ctr++)                            //  (double) Save the ROW-MAJOR Ui matrix to file
+          byteBuffer.putDouble(Ui.get((ctr - (ctr % h)) / h, ctr % h));
+        for(ctr = 0; ctr < h * h; ctr++)                            //  (double) Save the ROW-MAJOR Uo matrix to file
+          byteBuffer.putDouble(Uo.get((ctr - (ctr % h)) / h, ctr % h));
+        for(ctr = 0; ctr < h * h; ctr++)                            //  (double) Save the ROW-MAJOR Uf matrix to file
+          byteBuffer.putDouble(Uf.get((ctr - (ctr % h)) / h, ctr % h));
+        for(ctr = 0; ctr < h * h; ctr++)                            //  (double) Save the ROW-MAJOR Uc matrix to file
+          byteBuffer.putDouble(Uc.get((ctr - (ctr % h)) / h, ctr % h));
 
-        for(ctr = 0; ctr < h; ctr++)                                //  Write bi (h doubles)
-          {
-            try
-              {
-                fp.writeDouble(bi.get(ctr));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer bi weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h; ctr++)                                //  Write bo (h doubles)
-          {
-            try
-              {
-                fp.writeDouble(bo.get(ctr));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer bo weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h; ctr++)                                //  Write bf (h doubles)
-          {
-            try
-              {
-                fp.writeDouble(bf.get(ctr));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer bf weights.");
-                return false;
-              }
-          }
-        for(ctr = 0; ctr < h; ctr++)                                //  Write bc (h doubles)
-          {
-            try
-              {
-                fp.writeDouble(bc.get(ctr));
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer bc weights.");
-                return false;
-              }
-          }
+        for(ctr = 0; ctr < h; ctr++)                                //  (double) Save the bi vector to file
+          byteBuffer.putDouble(bi.get(ctr));
+        for(ctr = 0; ctr < h; ctr++)                                //  (double) Save the bo vector to file
+          byteBuffer.putDouble(bo.get(ctr));
+        for(ctr = 0; ctr < h; ctr++)                                //  (double) Save the bf vector to file
+          byteBuffer.putDouble(bf.get(ctr));
+        for(ctr = 0; ctr < h; ctr++)                                //  (double) Save the bc vector to file
+          byteBuffer.putDouble(bc.get(ctr));
 
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
-          buffer[ctr] = 0x00;
+          byteArr[ctr] = 0x00;
         ctr = 0;                                                    //  Fill in up to limit
         while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
           {
-            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            byteArr[ctr] = (byte)layerName.codePointAt(ctr);
             ctr++;
           }
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
+          byteBuffer.put(byteArr[ctr]);
+
+        byteArr = byteBuffer.array();
+
+        try
           {
-            try
-              {
-                fp.write(buffer[ctr]);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write LSTM Layer name to file.");
-                return false;
-              }
+            fp.write(byteArr, 0, byteArr.length);
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write LSTM Layer to file.");
+            return false;
           }
 
-        buffer = null;                                              //  Release the array
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
