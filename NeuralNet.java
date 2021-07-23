@@ -910,6 +910,16 @@ public class NeuralNet
               }
           }
 
+        try
+          {
+            fp.close();
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to close file.");
+            return false;
+          }
+
         byteArr = null;                                             //  Release array
         System.gc();                                                //  Summon the garbage collector
 
