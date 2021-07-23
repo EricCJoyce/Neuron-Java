@@ -9,6 +9,8 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 
 public class AccumLayer
@@ -75,36 +77,38 @@ public class AccumLayer
     public boolean read(DataInputStream fp)
       {
         int ctr;
-        byte buffer[];
+
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
+
+        allocation = 4 + NeuralNet.LAYER_NAME_LEN;                  //  Allocate space for 1 int and the layer name
+        byteArr = new byte[allocation];
 
         try
           {
-            i = fp.readInt();                                       //  (int) Read number of layer inputs from file
+            fp.read(byteArr);
           }
         catch(IOException ioErr)
           {
-            System.out.println("ERROR: Unable to read number of Accumulation Layer inputs.");
+            System.out.println("ERROR: Unable to read Accumulation Layer from file.");
             return false;
           }
 
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer = ByteBuffer.wrap(byteArr);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Read little-endian
+
+        i = byteBuffer.getInt();                                    //  (int) Read the number of inputs from file
+
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
+        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Read into array
+          byteArr[ctr] = byteBuffer.get();
+        layerName = new String(byteArr, StandardCharsets.UTF_8);
+
         out = new double[i];                                        //  (Re)Allocate output buffer
 
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];
-        for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)
-          {
-            try
-              {
-                buffer[ctr] = fp.readByte();
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to read Accumulation Layer name.");
-                return false;
-              }
-          }
-        layerName = new String(buffer, StandardCharsets.UTF_8);     //  Convert byte array to String
-
-        buffer = null;                                              //  Release the array
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
@@ -113,41 +117,42 @@ public class AccumLayer
     public boolean write(DataOutputStream fp)
       {
         int ctr;
-        byte buffer[];
 
-        try
-          {
-            fp.writeInt(i);                                         //  (int) Write number of layer inputs to file
-          }
-        catch(IOException ioErr)
-          {
-            System.out.println("ERROR: Unable to write number of Accumulation Layer inputs.");
-            return false;
-          }
+        ByteBuffer byteBuffer;
+        int allocation;
+        byte byteArr[];
+                                                                    //  Allocate space for
+        allocation = 4 + NeuralNet.LAYER_NAME_LEN;                  //  1 int and the layer name.
+        byteBuffer = ByteBuffer.allocate(allocation);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);                  //  Write little-endian
 
-        buffer = new byte[NeuralNet.LAYER_NAME_LEN];                //  Allocate
+        byteBuffer.putInt(i);                                       //  (int) Save AccumLayer input size to file
+
+        byteArr = new byte[NeuralNet.LAYER_NAME_LEN];               //  Allocate
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Blank out buffer
-          buffer[ctr] = 0x00;
+          byteArr[ctr] = 0x00;
         ctr = 0;                                                    //  Fill in up to limit
         while(ctr < NeuralNet.LAYER_NAME_LEN && ctr < layerName.length())
           {
-            buffer[ctr] = (byte)layerName.codePointAt(ctr);
+            byteArr[ctr] = (byte)layerName.codePointAt(ctr);
             ctr++;
           }
         for(ctr = 0; ctr < NeuralNet.LAYER_NAME_LEN; ctr++)         //  Write layer name to file
+          byteBuffer.put(byteArr[ctr]);
+
+        byteArr = byteBuffer.array();
+
+        try
           {
-            try
-              {
-                fp.write(buffer[ctr]);
-              }
-            catch(IOException ioErr)
-              {
-                System.out.println("ERROR: Unable to write Accumulation Layer name to file.");
-                return false;
-              }
+            fp.write(byteArr, 0, byteArr.length);
+          }
+        catch(IOException ioErr)
+          {
+            System.out.println("ERROR: Unable to write Accumulation Layer to file.");
+            return false;
           }
 
-        buffer = null;                                              //  Release the array
+        byteArr = null;                                             //  Release the array
         System.gc();                                                //  Call the garbage collector
 
         return true;
