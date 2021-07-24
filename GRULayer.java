@@ -340,26 +340,26 @@ public class GRULayer
         System.out.printf("State cache size       = %d\n", cache);
 
         System.out.printf("Wz (%d x %d)\n", h, d);
-        for(i = 0; i < d; i++)
+        for(i = 0; i < h; i++)
           {
             System.out.print("[");
-            for(j = 0; j < h; j++)
+            for(j = 0; j < d; j++)
               System.out.printf(" %.5f", Wz.get(i, j));
             System.out.print(" ]\n");
           }
         System.out.printf("Wr (%d x %d)\n", h, d);
-        for(i = 0; i < d; i++)
+        for(i = 0; i < h; i++)
           {
             System.out.print("[");
-            for(j = 0; j < h; j++)
+            for(j = 0; j < d; j++)
               System.out.printf(" %.5f", Wr.get(i, j));
             System.out.print(" ]\n");
           }
         System.out.printf("Wh (%d x %d)\n", h, d);
-        for(i = 0; i < d; i++)
+        for(i = 0; i < h; i++)
           {
             System.out.print("[");
-            for(j = 0; j < h; j++)
+            for(j = 0; j < d; j++)
               System.out.printf(" %.5f", Wh.get(i, j));
             System.out.print(" ]\n");
           }
