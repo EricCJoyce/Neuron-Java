@@ -417,34 +417,34 @@ public class LSTMLayer
         System.out.printf("State cache size       = %d\n", cache);
 
         System.out.printf("Wi (%d x %d)\n", h, d);
-        for(i = 0; i < d; i++)
+        for(i = 0; i < h; i++)
           {
             System.out.print("[");
-            for(j = 0; j < h; j++)
+            for(j = 0; j < d; j++)
               System.out.printf(" %.5f", Wi.get(i, j));
             System.out.print(" ]\n");
           }
         System.out.printf("Wf (%d x %d)\n", h, d);
-        for(i = 0; i < d; i++)
+        for(i = 0; i < h; i++)
           {
             System.out.print("[");
-            for(j = 0; j < h; j++)
+            for(j = 0; j < d; j++)
               System.out.printf(" %.5f", Wf.get(i, j));
             System.out.print(" ]\n");
           }
         System.out.printf("Wc (%d x %d)\n", h, d);
-        for(i = 0; i < d; i++)
+        for(i = 0; i < h; i++)
           {
             System.out.print("[");
-            for(j = 0; j < h; j++)
+            for(j = 0; j < d; j++)
               System.out.printf(" %.5f", Wc.get(i, j));
             System.out.print(" ]\n");
           }
         System.out.printf("Wo (%d x %d)\n", h, d);
-        for(i = 0; i < d; i++)
+        for(i = 0; i < h; i++)
           {
             System.out.print("[");
-            for(j = 0; j < h; j++)
+            for(j = 0; j < d; j++)
               System.out.printf(" %.5f", Wo.get(i, j));
             System.out.print(" ]\n");
           }
