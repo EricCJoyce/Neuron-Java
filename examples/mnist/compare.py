@@ -1,7 +1,7 @@
 '''
   Eric C. Joyce, Stevens Institute of Technology, 2020
   
-  Finally, let's compare our C-translation against the Keras original.
+  Finally, let's compare our Java-translation against the Keras original.
   e.g.  
    python compare.py mnist_06.h5 mnist.nn samples/sample_1.pgm
 
@@ -32,10 +32,10 @@ def main():
 	for i in range(0, len(y_hat[0])):
 		print("%.6f" % y_hat[0][i])
 
-	args = ['java', 'RunMNIST', neuronFile, pgmfilename]
+	args = ['java', '-cp', '.:./jblas-1.2.4.jar', 'RunNeuronModel', neuronFile, pgmfilename]
 	out = subprocess.check_output(args)
 	out = out.decode("utf-8").split('\n')[:-1]
-	print('\nNeuron-Java model returned:')
+	print('\nNeuron-C model returned:')
 	for i in range(0, len(out)):
 		print(out[i].split()[1])
 
