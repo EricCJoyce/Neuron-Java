@@ -1,6 +1,6 @@
 # Hand-Written Digit Classification
 
-This demonstrates the real motivation behind Neuron-Java: we want to be able to train a deep network in Keras but use what we learn in stand-alone Java applications without having to launch Python and load TensorFlow. At stake is the difference between a 39-millisecond runtime and a 13-second runtime.
+This demonstrates the real motivation behind Neuron-Java: we want to be able to train a deep network in Keras but use what we learn in stand-alone Java applications without having to launch Python and load TensorFlow. At stake is the difference between a 0.378-second runtime and a 13-second runtime.
 
 ## 1. Train a Convolutional Network in Keras
 
