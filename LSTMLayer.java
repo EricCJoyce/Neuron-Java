@@ -543,7 +543,7 @@ public class LSTMLayer
       }
 
     /* Return the LAST column vector of the H matrix.
-       (The latest cached state.O */
+       (The latest cached state.) */
     public double[] state()
       {
         double hVec[];
@@ -649,7 +649,7 @@ public class LSTMLayer
             c_vec.put(n, f_vec.get(n) * ct_1.get(n) + i_vec.get(n) * ActivationFunction.tanh(c_vec.get(n)));
             o_vec.put(n, ActivationFunction.sigmoid(o_vec.get(n))); //  o = sig(Wo*x + Uo*ht_1 + bo)
                                                                     //  h = o*tanh(c)
-            H.put(n, time, o_vec.get(n) * ActivationFunction.tanh(c_vec.get(n)));
+            H.put(n, time, o_vec.get(n) * ActivationFunction.tanh(c.get(n)));
           }
 
         x_vec = null;                                               //  Force release of allocated memory
