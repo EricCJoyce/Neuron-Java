@@ -482,7 +482,6 @@ public class GRULayer
         int time_1;                                                 //  Where we READ FROM
         int time;                                                   //  Where we WRITE TO
                                                                     //  layer->t increases indefinitely
-
         if(t == 0)                                                  //  Timestep layer->t = 0 uses the zero-vectors for t - 1
           {
             time_1 = 0;
