@@ -637,7 +637,7 @@ public class LSTMLayer
             for(m = 1; m < cache; m++)                              //  Shift down
               {
                 for(n = 0; n < h; n++)
-                  H.put(m - 1, n, H.get(m, n));
+                  H.put(n, m - 1, H.get(n, m));
               }
           }
 
