@@ -248,8 +248,8 @@ public class Conv2DLayer
         int i;
 
         for(i = 0; i < n; i++)
-          ctr += (int)(Math.floor((double)(inputW - filters[i].w + 1) / (double)filters[i].stride_h) *
-                       Math.floor((double)(inputH - filters[i].h + 1) / (double)filters[i].stride_v));
+          ctr += (int)( (Math.floor((double)(inputW - filters[i].w) / (double)filters[i].stride_h) + 1.0) *
+                        (Math.floor((double)(inputH - filters[i].h) / (double)filters[i].stride_v) + 1.0) );
 
         return ctr;
       }
@@ -273,8 +273,8 @@ public class Conv2DLayer
           {
             c = 0;
             softmaxdenom = 0.0;
-            filterOutputLen = (int)(Math.floor((double)(inputW - filters[i].w + 1) / (double)filters[i].stride_h) *
-                                    Math.floor((double)(inputH - filters[i].h + 1) / (double)filters[i].stride_v));
+            filterOutputLen = (int)( (Math.floor((double)(inputW - filters[i].w) / (double)filters[i].stride_h) + 1.0) *
+                                     (Math.floor((double)(inputH - filters[i].h) / (double)filters[i].stride_v) + 1.0) );
             cache = new double[filterOutputLen];
 
             for(y = 0; y <= inputH - filters[i].h; y += filters[i].stride_v)
