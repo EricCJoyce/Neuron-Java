@@ -149,7 +149,7 @@ public class BuildNeuronModel
             for(j = 0; j < 26; j++)
               w[j] = byteBuffer.getDouble();
 
-            nn.conv(0).setW_i(w, i);                                        //  Set weights for filter[0][i]
+            nn.conv(0).setW_i(w, i);                                //  Set weights for filter[0][i]
 
             try
               {
@@ -161,11 +161,6 @@ public class BuildNeuronModel
                 return;
               }
           }
-
-        /**************************************************************************/
-        /***********************************************************    A C C U M */
-        nn.addAccum(14624);                                         //  Add accumulator layer (ACCUM_ARRAY, 0)
-        nn.accum(0).setName("Accum-1");                             //  Name the first accumulator layer
 
         /**************************************************************************/
         /***********************************************************    D E N S E */
@@ -280,15 +275,12 @@ public class BuildNeuronModel
                                                                     //  Connect input to conv2d[0]
         if(!nn.linkLayers(NeuralNet.INPUT_ARRAY, 0, 0, 784, NeuralNet.CONV2D_ARRAY, 0))
           System.out.println(">>>                Link[0] failed");
-                                                                    //  Connect conv2d[0] to accum[0]
-        if(!nn.linkLayers(NeuralNet.CONV2D_ARRAY, 0, 0, 14624, NeuralNet.ACCUM_ARRAY, 0))
+                                                                    //  Connect conv2d[0] to dense[0]
+        if(!nn.linkLayers(NeuralNet.CONV2D_ARRAY, 0, 0, 14624, NeuralNet.DENSE_ARRAY, 0))
           System.out.println(">>>                Link[1] failed");
-                                                                    //  Connect accum[0] to dense[0]
-        if(!nn.linkLayers(NeuralNet.ACCUM_ARRAY, 0, 0, 14624, NeuralNet.DENSE_ARRAY, 0))
-          System.out.println(">>>                Link[2] failed");
                                                                     //  Connect dense[0] to dense[1]
         if(!nn.linkLayers(NeuralNet.DENSE_ARRAY, 0, 0, 100, NeuralNet.DENSE_ARRAY, 1))
-          System.out.println(">>>                Link[3] failed");
+          System.out.println(">>>                Link[2] failed");
 
         nn.sortEdges();
         nn.printEdgeList();
