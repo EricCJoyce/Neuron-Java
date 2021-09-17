@@ -379,10 +379,10 @@ public class NeuralNet
            denselayers[src].outputLen() > accumlayers[dst].inputs())
           return false;
         if(srcFlag == DENSE_ARRAY && dstFlag == LSTM_ARRAY &&       //  Dense-->LSTM
-           denselayers[src].outputLen() > lstmlayers[dst].inputDimensionality())
+           denselayers[src].outputLen() != lstmlayers[dst].inputDimensionality())
           return false;
         if(srcFlag == DENSE_ARRAY && dstFlag == GRU_ARRAY &&        //  Dense-->GRU
-           denselayers[src].outputLen() > grulayers[dst].inputDimensionality())
+           denselayers[src].outputLen() != grulayers[dst].inputDimensionality())
           return false;
         if(srcFlag == DENSE_ARRAY && dstFlag == POOL_ARRAY &&       //  Dense-->Pool
            denselayers[src].outputLen() != poollayers[dst].width() * poollayers[dst].height())
@@ -404,10 +404,10 @@ public class NeuralNet
            convlayers[src].outputLen() > accumlayers[dst].inputs())
           return false;
         if(srcFlag == CONV2D_ARRAY && dstFlag == LSTM_ARRAY &&      //  Conv2D-->LSTM
-           convlayers[src].outputLen() > lstmlayers[dst].inputDimensionality())
+           convlayers[src].outputLen() != lstmlayers[dst].inputDimensionality())
           return false;
         if(srcFlag == CONV2D_ARRAY && dstFlag == GRU_ARRAY &&       //  Conv2D-->GRU
-           convlayers[src].outputLen() > grulayers[dst].inputDimensionality())
+           convlayers[src].outputLen() != grulayers[dst].inputDimensionality())
           return false;
         if(srcFlag == CONV2D_ARRAY && dstFlag == POOL_ARRAY &&      //  Conv2D-->Pool
            convlayers[src].outputLen() != poollayers[dst].width() * poollayers[dst].height())
