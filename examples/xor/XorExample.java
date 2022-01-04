@@ -1,8 +1,11 @@
 /*
-jblas-1.2.4.jar needs to be in the same directory as all the Neuron *.java files and xor.java.
+jblas-1.2.4.jar needs to be in the same directory as all the Neuron *.java files and XorExample.java.
 
 This program creates a network file named "xor.nn".
 Issue the following commands to compile and run.
+
+Compile by calling:
+  make
 
 Run by calling:
   java -cp .:./jblas-1.2.4.jar XorExample
